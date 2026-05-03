@@ -45,6 +45,7 @@
         window.onload = function () {
             const ref     = sessionStorage.getItem("document_ref");
             const docType = sessionStorage.getItem("document_type");
+            const isAdmin = sessionStorage.getItem("from_admin");
 
             if (ref) {
                 document.getElementById("ref-number").innerText = ref;
@@ -60,7 +61,24 @@
                 document.getElementById("doc-type-box").style.display = "block";
                 sessionStorage.removeItem("document_type");
             }
+
+            // Set back button destination
+            const homeBtn = document.querySelector(".home-btn");
+            if (isAdmin === "doc") {
+                homeBtn.textContent = "Back to Document Requests";
+                homeBtn.onclick = function() {
+                    sessionStorage.removeItem("from_admin");
+                    window.location.href = "Documentrequest.html";
+                };
+            } else {
+                homeBtn.onclick = function() {
+                    window.location.href = "welcomepage.html";
+                };
+            }
         };
+
     </script>
+
 </body>
+
 </html>

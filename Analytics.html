@@ -1,9 +1,8 @@
 <!DOCTYPE html>
-
 <html>
     <head>
-        <title>Home | Barangay Tugtug E-System</title>
-        <script src='Javascript/Dashboard.js'></script>
+        <title>Analytics | Barangay Tugtug E-System</title>
+        <link rel="stylesheet" href="cssfile/Dashboard.css"/>
         <link rel="stylesheet" href="cssfile/Analytics.css"/>
         <meta charset="UTF-8"/>
         <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -11,100 +10,173 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 
+        <!-- Chart.js -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     </head>
 
     <body>
 
+        <!-- ── Sidebar (same as other pages) ── -->
         <nav class="sidebar-container">
-
-            <div class="Logo-container" >
-
-                <image class="Logo" src="photos/logo.png.png" alt="Error to Load Image"></image>
+            <div class="Logo-container">
+                <image class="Logo" src="photos/logo.png.png" alt="Logo"></image>
                 <h2 class="E-System">Barangay E-System</h2>
 
-            <div class="home-container">
+                <div class="home-container" onclick="window.location.href='Dashboard.html'">
+                    <button class="Home" type="button"><image class="picture-home" src="photos/Home.png"></image></button>
+                    <h3 class="Home-word">Home</h3>
+                </div>
+
+                <div class="document-container" onclick="window.location.href='Documentrequest.html'">
+                    <button class="Document" type="button"><image class="picture-document" src="photos/Document.png"></image></button>
+                    <h3 class="Document-word">Document Requests</h3>
+                </div>
+
+                <div class="blotter-container" onclick="window.location.href='Blotter.html'">
+                    <button class="Blotter" type="button"><image class="picture-blotter" src="photos/Blotter.png"></image></button>
+                    <h3 class="Blotter-word">Blotter Dashboard</h3>
+                </div>
                 
-                <button class="Home" type="submit"><image class="picture-home" src="photos/home.png"></image></button>
-                <h3 class="Home-word">Home</h3>
+                <hr class="sidebar-divider2">
 
-            </div>
-            
-                
-            <div class="document-container" onclick="window.location.href='Documentrequest.html'">
+                <!-- Analytics nav item -->
+                <div class="analytics-container analytics-active">
+                    <button class="Analytics-btn" type="button">
+                        <i class="fa fa-bar-chart analytics-icon"></i>
+                    </button>
+                    <h3 class="Analytics-word">Analytics</h3>
+                </div>
 
-                <button class="Document" type="submit" onclick="window.location.href='Documentrequest.html'"><image class="picture-document" src="photos/Document.png"></image></button>
-                <h3 class="Document-word">Document Requests</h3>
-
-            </div>
-
-
-            <div class="blotter-container" onclick="window.location.href='Blotter.html'">
-
-                <button class="Blotter" type="submit" onclick="window.location.href='Blotter.html'"><image class="picture-blotter" src="photos/Blotter.png"></image></button>
-                <h3 class="Blotter-word">Blotter Dashboard</h3>
-            </div>
-
-            <hr class="sidebar-divider2">
-
-            <div class="analytics-container" onclick="window.location.href='Analytics.html'">
-
-                <button class="Analytics" type="submit" onclick="window.location.href='Analytics.html'"><image class="picture-analytics" src="photos/analytics.png"></image></button>
-                <h3 class="Analytics-word">Analytics</h3>
-            </div>
-
-
-            <div>
-
-                <button class="Profile" type="submit"><image class="picture-profile" src="photos/ProfilePicture.png"></image></button>
-                <hr class="sidebar-divider">
-                <button class="Logout" type="submit" onclick="window.location.href='Login.html'"><image class="picture-logout" src="photos/Logout.png"></image></button>
-
-            </div>
-
-            </div>
-
-        </nav>
-
-
-        <nav class="upbar-container">
-
-            <h1 class="home-title">Analytics</h1>
-            
-            
-
-        </nav>
-
-        <section class="database">
-            <div class="container-bar">
-                <div class="search-wrapper">
-
-                    <div class="search-group">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" placeholder="Search records" class="search-input">
-                    </div>
-
-                    <div class="filter-group">
-                        <select class="filter-select">
-                            <option value="">Filter By</option>
-                            <option value="date">Date</option>
-                            <optgroup label="Status">
-                                <option value="Pending">Pending</option>
-                                <option value="Scheduled">Scheduled</option>
-                                <option value="Resolved">Resolved</option>
-                                <option value="Escalated">Escalated</option>
-                            </optgroup>
-                        </select>
-
-                        <button class="btn-display">Display All</button>
-                        <button class="btn-hearings">Hearings</button>
-                    </div>
-
+                <div>
+                    <button class="Profile" type="button"><image class="picture-profile" src="photos/ProfilePicture.png"></image></button>
+                    <hr class="sidebar-divider">
+                    <button class="Logout" type="button" onclick="window.location.href='Login.html'"><image class="picture-logout" src="photos/Logout.png"></image></button>
                 </div>
             </div>
+        </nav>
 
-        </section>
+        <!-- ── Top Bar ── -->
+        <nav class="upbar-container">
+            <h1 class="home-title">Analytics</h1>
+        </nav>
 
+        <!-- ── Main Content ── -->
+        <div class="analytics-page-wrapper">
+
+            <!-- ════════════════════════════════════════════
+                 SECTION 1 — Document Requests Bar Chart
+            ═════════════════════════════════════════════ -->
+            <section class="analytics-card" id="doc-analytics-card">
+                <div class="card-header">
+                    <div class="card-title-group">
+                        <i class="fa fa-file-text card-icon"></i>
+                        <h2 class="card-title">Document Requests by Type</h2>
+                    </div>
+                    <div class="card-controls">
+                        <label class="ctrl-label">Month</label>
+                        <select id="doc-month-select" class="ctrl-select">
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                        <label class="ctrl-label">Year</label>
+                        <select id="doc-year-select" class="ctrl-select">
+                            <!-- filled by JS -->
+                        </select>
+                        <button id="doc-load-btn" class="ctrl-btn">
+                            <i class="fa fa-refresh"></i> Load
+                        </button>
+                    </div>
+                </div>
+
+                <div class="chart-area" id="doc-chart-area">
+                    <div class="chart-placeholder" id="doc-placeholder">
+                        <i class="fa fa-bar-chart placeholder-icon"></i>
+                        <p>Select a month and year, then click <strong>Load</strong> to view document request data.</p>
+                    </div>
+                    <div class="chart-canvas-wrapper" id="doc-canvas-wrapper" style="display:none;"><canvas id="docChart"></canvas></div>
+                </div>
+
+                <div class="summary-row" id="doc-summary" style="display:none;">
+                    <div class="summary-chip total-chip">
+                        <span class="chip-label">Total Requests</span>
+                        <span class="chip-value" id="doc-total-val">0</span>
+                    </div>
+                    <div class="summary-chip top-chip">
+                        <span class="chip-label">Most Requested</span>
+                        <span class="chip-value" id="doc-top-val">—</span>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- ════════════════════════════════════════════
+                 SECTION 2 — Blotter Cases Monthly Chart
+            ═════════════════════════════════════════════ -->
+            <section class="analytics-card" id="blotter-analytics-card">
+                <div class="card-header">
+                    <div class="card-title-group">
+                        <i class="fa fa-shield card-icon"></i>
+                        <h2 class="card-title">Blotter Cases per Month</h2>
+                    </div>
+                    <div class="card-controls">
+                        <label class="ctrl-label">Year</label>
+                        <select id="blotter-year-select" class="ctrl-select">
+                            <!-- filled by JS -->
+                        </select>
+                        <button id="blotter-load-btn" class="ctrl-btn">
+                            <i class="fa fa-refresh"></i> Load
+                        </button>
+                    </div>
+                </div>
+
+                <div class="chart-area" id="blotter-chart-area">
+                    <div class="chart-placeholder" id="blotter-placeholder">
+                        <i class="fa fa-shield placeholder-icon"></i>
+                        <p>Select a year, then click <strong>Load</strong> to view blotter case data.</p>
+                    </div>
+                    <div class="chart-canvas-wrapper" id="blotter-canvas-wrapper" style="display:none;"><canvas id="blotterChart"></canvas></div>
+                </div>
+
+                <div class="summary-row" id="blotter-summary" style="display:none;">
+                    <div class="summary-chip total-chip">
+                        <span class="chip-label">Total Filed</span>
+                        <span class="chip-value" id="blotter-total-val">0</span>
+                    </div>
+                    <div class="summary-chip resolved-chip">
+                        <span class="chip-label">Resolved</span>
+                        <span class="chip-value" id="blotter-resolved-val">0</span>
+                    </div>
+                    <div class="summary-chip escalated-chip">
+                        <span class="chip-label">Escalated</span>
+                        <span class="chip-value" id="blotter-escalated-val">0</span>
+                    </div>
+                    <div class="summary-chip dismissed-chip">
+                        <span class="chip-label">Dismissed</span>
+                        <span class="chip-value" id="blotter-dismissed-val">0</span>
+                    </div>
+                    <div class="summary-chip pending-chip">
+                        <span class="chip-label">Pending</span>
+                        <span class="chip-value" id="blotter-pending-val">0</span>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <div class="spacer"></div>
+
+        <script src="Javascript/Analytics.js"></script>
     </body>
-
 </html>

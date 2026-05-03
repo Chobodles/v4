@@ -133,7 +133,7 @@ body.fade-out {
 .sidebar-container:hover .Home-word{
     visibility: visible;
     position: relative;
-    bottom: 94%;
+    bottom: 90%;
     left: 5vw;
     font-size: 2vh;
     cursor: pointer;
@@ -370,7 +370,7 @@ body.fade-out {
 
 .sidebar-container:hover .Analytics-word{
     position: relative;
-    bottom: 55%;
+    bottom: 86%;
     left: 5vw;
     font-size: 2vh;
     cursor: pointer;

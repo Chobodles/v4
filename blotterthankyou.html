@@ -38,17 +38,33 @@
 
     <script>
         window.onload = function () {
-            const ref = sessionStorage.getItem("blotter_ref");
+            const ref     = sessionStorage.getItem("blotter_ref");
+            const isAdmin = sessionStorage.getItem("from_admin");
+
             if (ref) {
                 document.getElementById("ref-number").innerText = ref;
                 sessionStorage.removeItem("blotter_ref");
             } else {
-                // Fallback random (in case PHP wasn't used)
                 const year = new Date().getFullYear();
                 const rand = Math.floor(1000 + Math.random() * 9000);
                 document.getElementById("ref-number").innerText = "BRGY-" + year + "-" + rand;
             }
+
+            // Set back button destination
+            const homeBtn = document.querySelector(".home-btn");
+            if (isAdmin === "blotter") {
+                homeBtn.textContent = "Back to Blotter Dashboard";
+                homeBtn.onclick = function() {
+                    sessionStorage.removeItem("from_admin");
+                    window.location.href = "Blotter.html";
+                };
+            } else {
+                homeBtn.onclick = function() {
+                    window.location.href = "welcomepage.html";
+                };
+            }
         };
+
     </script>
 </body>
 </html>

@@ -75,7 +75,26 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   searchInput.addEventListener("input", debounce(() => fetchRecords(), 400));
-  btnPrint.addEventListener("click", () => window.print());
+  // ── Dashboard Print All — fetches all records and prints a summary ──
+  btnPrint.addEventListener("click", () => {
+    const origText = btnPrint.textContent;
+    btnPrint.textContent = "Loading…";
+    btnPrint.disabled = true;
+
+    fetch("php/GetBlotter.php")
+      .then(res => res.json())
+      .then(data => {
+        btnPrint.textContent = origText;
+        btnPrint.disabled = false;
+        if (!data.success || !data.records) { showToast("❌ Could not load records for printing."); return; }
+        printAllRecords(data.records, data.counts);
+      })
+      .catch(() => {
+        btnPrint.textContent = origText;
+        btnPrint.disabled = false;
+        showToast("❌ Server error while loading records.");
+      });
+  });
 
   // Hearings button — filter to Scheduled only
   if (btnHearings) {
@@ -983,204 +1002,615 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ── Print blotter record ─────────────────────────────────
   window.printBlotterRecord = function () {
-    const modal = document.getElementById("update-modal");
-    if (!modal) return;
+    if (!currentRec) return;
+    const rec    = currentRec;
+    const modal  = document.getElementById("update-modal");
 
-    // Collect key-value pairs from the info section
-    const fields = {};
-    modal.querySelectorAll("div[style*='border-bottom:1px solid #dde8cc']").forEach(row => {
-      const spans = row.querySelectorAll("span");
-      if (spans.length >= 2) {
-        fields[spans[0].textContent.trim()] = spans[1].textContent.trim() || "—";
-      }
-    });
+    // ── Pull live resolution fields from modal if open ──────
+    const kagawad   = modal?.querySelector("#presiding-kagawad")?.value  || rec.presiding_kagawad  || "";
+    const secretary = modal?.querySelector("#secretary-name")?.value     || rec.secretary_name     || "";
+    const resNotes  = modal?.querySelector("#resolution-notes")?.value   || rec.resolution_notes   || "";
+    const resolvedAt = modal?.querySelector("#resolved-at-input")?.value
+      || (rec.resolved_at ? rec.resolved_at.split("T")[0] : "");
 
-    // Build schedule rows
-    let schedHtml = "";
-    for (let i = 1; i <= 3; i++) {
-      const readDiv = modal.querySelector(`#sched-read-${i}`);
-      if (readDiv) {
-        const strongs = [...readDiv.querySelectorAll("strong")];
-        const date    = strongs[0]?.textContent.trim() || "—";
-        const time    = strongs[1]?.textContent.trim() || "—";
-        const allText = [...readDiv.querySelectorAll("span")];
-        const detSpan = allText.find(s => s.textContent.includes("Details:"));
-        const details = detSpan ? detSpan.textContent.replace("Details:", "").trim() || "—" : "—";
-        const badge   = readDiv.querySelector(".sched-outcome-badge");
-        const outcome = badge ? badge.textContent.trim() : "—";
-        schedHtml += `<tr>
-          <td style="padding:6px 10px;font-weight:700;background:#f0f4e8;border:1px solid #c5d9a0;white-space:nowrap;">Schedule ${i}</td>
-          <td style="padding:6px 10px;border:1px solid #c5d9a0;">${date}</td>
-          <td style="padding:6px 10px;border:1px solid #c5d9a0;">${time}</td>
-          <td style="padding:6px 10px;border:1px solid #c5d9a0;">${details}</td>
-          <td style="padding:6px 10px;border:1px solid #c5d9a0;font-weight:700;">${outcome}</td>
-        </tr>`;
-      } else {
-        schedHtml += `<tr>
-          <td style="padding:6px 10px;font-weight:700;background:#f0f4e8;border:1px solid #c5d9a0;">Schedule ${i}</td>
-          <td colspan="4" style="padding:6px 10px;border:1px solid #c5d9a0;color:#999;font-style:italic;">Not yet scheduled</td>
-        </tr>`;
-      }
+    // ── Helpers ─────────────────────────────────────────────
+    function fmtD(d) {
+      if (!d) return "—";
+      const dt = new Date(d);
+      return dt.toLocaleDateString("en-PH", { year:"numeric", month:"long", day:"numeric" });
+    }
+    function fmtT(t) {
+      if (!t) return "—";
+      const [h, m] = String(t).split(":");
+      const hr = parseInt(h);
+      return `${hr % 12 || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`;
+    }
+    function safe(v) {
+      return v ? String(v).replace(/</g,"&lt;").replace(/>/g,"&gt;") : "—";
     }
 
-    const statusBadge = modal.querySelector(".status-banner .status-value")?.textContent.trim()
-      || modal.querySelector("[id='modal-status-select']")?.value
-      || fields["Current Status"] || "—";
-    const resolvedAt   = modal.querySelector("#resolved-at-input")?.value || "—";
-    const kagawad      = modal.querySelector("#presiding-kagawad")?.value || "—";
-    const secretary    = modal.querySelector("#secretary-name")?.value || "—";
-    const resNotes     = modal.querySelector("#resolution-notes")?.value || "—";
-    const todayStr     = new Date().toLocaleDateString("en-PH", { year:"numeric", month:"long", day:"numeric" });
+    // ── Age category — not stored separately, left blank for barangay staff ─
+    const ageCatLabel = "";
 
-    const f = fields;
-    const win = window.open("", "_blank", "width=900,height=750");
+    // ── Resolution block (only for Resolved / Escalated) ────
+    const isSettled = rec.status === "Resolved" || rec.status === "Escalated";
+    const resBlock = isSettled ? `
+      <div class="section-title">${rec.status === "Escalated" ? "🔺 Escalation Details" : "✅ Resolution Details"}</div>
+      <table class="info-table">
+        <tr>
+          <td class="lbl">Date ${rec.status === "Escalated" ? "Escalated" : "Resolved"}</td>
+          <td>${safe(fmtD(resolvedAt))}</td>
+          <td class="lbl">Presiding Kagawad</td>
+          <td>${safe(kagawad)}</td>
+        </tr>
+        <tr>
+          <td class="lbl">Secretary</td>
+          <td>${safe(secretary)}</td>
+          <td class="lbl">Blotter Status</td>
+          <td><strong>${safe(rec.status)}</strong></td>
+        </tr>
+        <tr>
+          <td class="lbl">Resolution / Notes</td>
+          <td colspan="3">${safe(resNotes)}</td>
+        </tr>
+      </table>` : "";
+
+    const todayStr = new Date().toLocaleDateString("en-PH", { year:"numeric", month:"long", day:"numeric" });
+
+    // ── Status badge style ───────────────────────────────────
+    const statusStyleMap = {
+      Pending:   "background:#fff3cd;color:#856404;border:1px solid #ffc107;",
+      Scheduled: "background:#cfe2ff;color:#084298;border:1px solid #0d6efd;",
+      Resolved:  "background:#d1e7dd;color:#0a3622;border:1px solid #198754;",
+      Escalated: "background:#e2d9f3;color:#4a235a;border:1px solid #8b5cf6;",
+    };
+    const statusStyle = statusStyleMap[rec.status] || "background:#eee;color:#333;border:1px solid #aaa;";
+
+    const win = window.open("", "_blank", "width=900,height=800");
     win.document.write(`<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barangay Blotter</title>
+<title>Barangay Blotter — ${safe(rec.reference_number)}</title>
 <style>
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'Times New Roman',serif; font-size:12px; color:#000; background:white; padding:30px 40px; }
-  .header { text-align:center; margin-bottom:10px; }
-  .header p  { font-size:11px; margin:1px 0; }
-  .header h1 { font-size:22px; font-weight:bold; color:#032f15; margin:4px 0 2px; }
-  .header h2 { font-size:13px; font-weight:bold; margin:2px 0; }
-  .header h3 { font-size:15px; font-weight:normal; margin:10px 0 0;
-    border-top:2px solid #000; border-bottom:2px solid #000; padding:4px 0; letter-spacing:2px; }
-  .stitle { font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:1px;
-    color:#375309; margin:14px 0 4px; border-bottom:1px solid #375309; padding-bottom:2px; }
-  table.info { width:100%; border-collapse:collapse; margin-bottom:6px; }
-  table.info td { padding:5px 8px; border:1px solid #ccc; font-size:11.5px; vertical-align:top; }
-  table.info td.lbl { font-weight:bold; background:#f5f5f5; width:22%; white-space:nowrap; }
-  table.sched { width:100%; border-collapse:collapse; font-size:11px; }
-  table.sched th { background:#273b07; color:#fff; padding:6px 8px; text-align:left; font-size:10.5px; }
-  .complaint { border:1px solid #ccc; border-radius:4px; padding:8px 10px;
-    font-size:11.5px; min-height:40px; margin-bottom:4px; line-height:1.6; }
-  .sig-row { display:flex; gap:20px; margin-top:24px; }
-  .sig-col { flex:1; text-align:center; }
-  .sig-line { border-bottom:1px solid #000; height:38px; margin-bottom:4px; }
-  .sig-lbl { font-size:10px; font-weight:bold; text-transform:uppercase; }
-  .footer { margin-top:20px; padding-top:8px; border-top:1px solid #ccc;
-    font-size:9.5px; color:#777; text-align:center; }
-  @media print { body { padding:15px 20px; } @page { margin:1cm; } }
+  /* ── Reset ─────────────────────────────────────── */
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+  /* ── Page ──────────────────────────────────────── */
+  body {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 12.5px;
+    color: #000;
+    background: #fff;
+    padding: 32px 44px;
+  }
+  @media print {
+    body { padding: 0; }
+    @page { size: A4 portrait; margin: 1.5cm 1.8cm; }
+    .no-print { display: none !important; }
+    .page-break { page-break-before: always; }
+  }
+
+  /* ── Header ─────────────────────────────────────── */
+  .form-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .form-logo {
+    width: 78px;
+    height: auto;
+    flex-shrink: 0;
+  }
+  .header-text {
+    flex: 1;
+    text-align: center;
+    padding: 0 12px;
+  }
+  .header-text .line-sm   { font-size: 10.5px; margin: 1px 0; }
+  .header-text .brgy-name { font-size: 22px; font-weight: bold; color: #032f15; margin: 3px 0; }
+  .header-text .office    { font-size: 12px; font-weight: bold; margin: 2px 0; }
+  .ref-badge {
+    text-align: right;
+    font-size: 10px;
+    color: #555;
+    flex-shrink: 0;
+    min-width: 90px;
+  }
+  .ref-badge strong { display: block; font-size: 12px; color: #032f15; }
+
+  /* ── Form title ─────────────────────────────────── */
+  .form-title {
+    text-align: center;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    border-top: 2.5px solid #000;
+    border-bottom: 2.5px solid #000;
+    padding: 5px 0;
+    margin: 8px 0 14px;
+  }
+
+  /* ── Section title ──────────────────────────────── */
+  .section-title {
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #032f15;
+    border-bottom: 1.5px solid #032f15;
+    padding-bottom: 2px;
+    margin: 14px 0 5px;
+  }
+
+  /* ── Info table ─────────────────────────────────── */
+  .info-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+  }
+  .info-table td {
+    padding: 6px 9px;
+    border: 1px solid #c8c8c8;
+    font-size: 12px;
+    vertical-align: top;
+  }
+  .info-table td.lbl {
+    font-weight: bold;
+    background: #f5f5f0;
+    width: 20%;
+    white-space: nowrap;
+    color: #333;
+  }
+  .info-table td.val-lg { font-size: 12.5px; }
+
+  /* ── Form rows (label-above style) ──────────────── */
+  .field-label {
+    display: block;
+    font-size: 9.5px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #374151;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+    margin-top: 10px;
+  }
+  .field-value {
+    border-bottom: 1px solid #444;
+    min-height: 20px;
+    font-size: 12.5px;
+    padding: 2px 4px;
+    display: block;
+  }
+  .field-box {
+    border: 1px solid #c8c8c8;
+    border-radius: 3px;
+    padding: 6px 8px;
+    min-height: 20px;
+    font-size: 12.5px;
+  }
+
+  /* ── Two-column row ─────────────────────────────── */
+  .row2 { display: flex; gap: 20px; }
+  .row2 .col { flex: 1; }
+
+  /* ── Textarea-style block ───────────────────────── */
+  .complaint-block {
+    border: 1px solid #c8c8c8;
+    border-radius: 3px;
+    padding: 8px 10px;
+    min-height: 60px;
+    font-size: 12.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+  }
+
+  /* ── Radio inline ───────────────────────────────── */
+  .radio-group {
+    display: flex;
+    gap: 24px;
+    margin-top: 4px;
+    font-size: 12px;
+  }
+  .radio-group .opt { display: flex; align-items: center; gap: 5px; }
+  .radio-box {
+    width: 11px; height: 11px;
+    border: 1.5px solid #444;
+    border-radius: 50%;
+    display: inline-block;
+    position: relative;
+  }
+  .radio-box.checked::after {
+    content: '';
+    width: 6px; height: 6px;
+    background: #032f15;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* ── Divider ─────────────────────────────────────── */
+  .divider { border: 0; border-top: 1.5px solid #032f15; opacity: 0.2; margin: 14px 0; }
+
+  /* ── Footer text ─────────────────────────────────── */
+  .location-footer {
+    font-size: 12px;
+    line-height: 2.1;
+    margin: 10px 0;
+  }
+  .location-footer .fill {
+    display: inline-block;
+    border-bottom: 1px solid #000;
+    min-width: 60px;
+    text-align: center;
+    font-weight: bold;
+    padding: 0 4px;
+  }
+  .fill-wide  { min-width: 110px !important; }
+  .fill-short { min-width: 36px !important; }
+
+  /* ── Status badge ────────────────────────────────── */
+  .status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: bold;
+  }
+
+  /* ── Schedule table ──────────────────────────────── */
+  .sched-table { width:100%; border-collapse:collapse; font-size:11.5px; margin-bottom:6px; }
+  .sched-table th {
+    background: #273b07; color: #fff;
+    padding: 6px 9px; text-align: left; font-size: 11px;
+  }
+  .sched-table td { padding: 6px 9px; border: 1px solid #c8c8c8; }
+  .sched-table .s-num   { font-weight: bold; background: #f0f4e8; white-space: nowrap; }
+  .sched-table .s-out   { font-weight: bold; }
+  .sched-table .s-empty { color: #999; font-style: italic; }
+
+  /* ── Signature section ───────────────────────────── */
+  .sig-section { margin-top: 30px; }
+  .sig-row { display: flex; gap: 24px; margin-top: 0; }
+  .sig-col { flex: 1; text-align: center; }
+  .sig-line {
+    border-bottom: 1px solid #000;
+    height: 42px;
+    margin-bottom: 5px;
+  }
+  .sig-lbl {
+    font-size: 9.5px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #333;
+  }
+
+  /* ── Page footer ─────────────────────────────────── */
+  .page-footer {
+    margin-top: 18px;
+    padding-top: 6px;
+    border-top: 1px solid #ccc;
+    font-size: 9.5px;
+    color: #888;
+    text-align: center;
+  }
+
+  /* ── Print button ────────────────────────────────── */
+  .print-btn {
+    display: block;
+    margin: 0 auto 20px;
+    padding: 10px 32px;
+    background: #032f15;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  .print-btn:hover { background: #054d22; }
 </style>
 </head>
 <body>
-<div class="header">
-  <p>Republic of the Philippines</p>
-  <p>PROVINCE OF BATANGAS</p>
-  <p>Municipality of San Jose</p>
-  <h1>Barangay Tugtug</h1>
-  <h2>OFFICE OF THE PUNONG BARANGAY</h2>
-  <h3>BARANGAY BLOTTER</h3>
+
+<button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+
+<!-- ═══════════════════════════════════════════════════
+     HEADER  (mirrors blotterdemo.html)
+════════════════════════════════════════════════════ -->
+<div class="form-header">
+  <img class="form-logo" src="../photos/logo.png.png" alt="Barangay Logo"
+    onerror="this.style.display='none'">
+
+  <div class="header-text">
+    <p class="line-sm">Republic of the Philippines</p>
+    <p class="line-sm">PROVINCE OF BATANGAS</p>
+    <p class="line-sm">Municipality of San Jose</p>
+    <p class="brgy-name">Barangay Tugtug</p>
+    <p class="office">OFFICE OF THE PUNONG BARANGAY</p>
+  </div>
+
+  <div class="ref-badge">
+    <span>Reference No.</span>
+    <strong>${safe(rec.reference_number)}</strong>
+    <br>
+    <span style="margin-top:4px;display:block;">
+      Status: <span class="status-badge" style="${statusStyle}">${safe(rec.status)}</span>
+    </span>
+  </div>
 </div>
 
-<div class="stitle">Complainee Information</div>
-<table class="info">
-  <tr>
-    <td class="lbl">Name</td>
-    <td>${f["Full Name"] || "—"}</td>
-    <td class="lbl">Reference No.</td>
-    <td>${f["Reference No."] || "—"}</td>
-  </tr>
-  <tr>
-    <td class="lbl">Age</td>
-    <td>${f["Age"] || "—"}</td>
-    <td class="lbl">Civil Status</td>
-    <td>${f["Civil Status"] || "—"}</td>
-  </tr>
-  <tr>
-    <td class="lbl">Address</td>
-    <td colspan="3">${f["Address"] || "—"}</td>
-  </tr>
-  <tr>
-    <td class="lbl">Occupation</td>
-    <td colspan="3">${f["Occupation"] || "—"}</td>
-  </tr>
-  <tr>
-    <td class="lbl">Petsa (Date)</td>
-    <td>${f["Date of Incident"] || "—"}</td>
-    <td class="lbl">Oras (Time)</td>
-    <td>${f["Time of Incident"] || "—"}</td>
-  </tr>
-  <tr>
-    <td class="lbl">Nagsadya Dito Si</td>
-    <td>${f["Complaint Against"] || "—"}</td>
-    <td class="lbl">Complaint Type</td>
-    <td>${f["Complaint Type"] || "—"}</td>
-  </tr>
-</table>
+<div class="form-title">BARANGAY BLOTTER</div>
 
-<div class="stitle">Reklamo / Tulong (For/Para Kay/Sa)</div>
-<div class="complaint">${f["Complaint Details"] || "—"}</div>
+<!-- ═══════════════════════════════════════════════════
+     COMPLAINEE INFORMATION
+════════════════════════════════════════════════════ -->
+<span class="field-label">NAME</span>
+<span class="field-value">${safe(rec.full_name)}</span>
 
-<div style="font-size:11px;margin:10px 0 4px;">
-  Ipinatala ganap na ika __________ ng (umaga/hapon), ika __________ ng __________________, 20____<br>
+<div class="row2">
+  <div class="col">
+    <span class="field-label">AGE</span>
+    <span class="field-value">${safe(rec.age)}</span>
+  </div>
+  <div class="col">
+    <span class="field-label">STATUS (Civil Status)</span>
+    <span class="field-value">${safe(rec.civil_status)}</span>
+  </div>
+</div>
+
+<span class="field-label">ADDRESS</span>
+<span class="field-value">${safe(rec.address)}</span>
+
+<span class="field-label">OCCUPATION</span>
+<span class="field-value">${safe(rec.occupation)}</span>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════
+     INCIDENT DETAILS
+════════════════════════════════════════════════════ -->
+<div class="row2">
+  <div class="col">
+    <span class="field-label">PETSA (DATE)</span>
+    <span class="field-value">${safe(fmtD(rec.petsa))}</span>
+  </div>
+  <div class="col">
+    <span class="field-label">ORAS (TIME)</span>
+    <span class="field-value">${safe(fmtT(rec.oras))}</span>
+  </div>
+</div>
+
+<span class="field-label">NAGSADYA DITO SI (NAME OF COMPLAINANT)</span>
+<span class="field-value">${safe(rec.complaint_against)}</span>
+
+<div class="field-label" style="margin-top:6px;">AGE CATEGORY</div>
+<div class="radio-group">
+  <div class="opt">
+    <span class="radio-box"></span>
+    Minor
+  </div>
+  <div class="opt">
+    <span class="radio-box"></span>
+    May Sapat na Gulang (Adult)
+  </div>
+</div>
+
+<span class="field-label" style="margin-top:10px;">COMPLAINT TYPE</span>
+<span class="field-value">${safe(rec.complaint_type)}</span>
+
+<span class="field-label">REKLAMO / TULONG (FOR/PARA KAY/SA)</span>
+<div class="complaint-block">${safe(rec.complaint_details)}</div>
+
+<!-- ═══════════════════════════════════════════════════
+     LOCATION FOOTER  — left blank, to be filled at barangay
+════════════════════════════════════════════════════ -->
+<div class="location-footer">
+  Ipinatala ganap na ika
+  <span class="fill" style="min-width:80px;">&nbsp;</span>
+  ng (<span class="fill fill-short">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>), ika
+  <span class="fill fill-short">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+  ng
+  <span class="fill fill-wide">&nbsp;</span>,
+  20<span class="fill fill-short">&nbsp;&nbsp;&nbsp;&nbsp;</span>
+  <br>
   Tanggapan ng Punong Barangay, Tugtug, San Jose, Batangas.
 </div>
 
-<div class="stitle">Schedule Management</div>
-<table class="sched">
-  <thead><tr>
-    <th style="width:13%;">Schedule</th>
-    <th style="width:17%;">Date</th>
-    <th style="width:13%;">Time</th>
-    <th>Details / Notes</th>
-    <th style="width:22%;">Outcome</th>
-  </tr></thead>
-  <tbody>${schedHtml}</tbody>
-</table>
+<hr class="divider">
 
-<div class="stitle">Blotter Status &amp; Resolution</div>
-<table class="info">
-  <tr>
-    <td class="lbl">Status</td>
-    <td><strong>${statusBadge}</strong></td>
-    <td class="lbl">Date Resolved/Escalated</td>
-    <td>${resolvedAt}</td>
-  </tr>
-  <tr>
-    <td class="lbl">Presiding Kagawad</td>
-    <td>${kagawad}</td>
-    <td class="lbl">Secretary</td>
-    <td>${secretary}</td>
-  </tr>
-  <tr>
-    <td class="lbl">Resolution Notes</td>
-    <td colspan="3">${resNotes}</td>
-  </tr>
-</table>
+<!-- ═══════════════════════════════════════════════════
+     SIGNATURE SECTION  (mirrors blotterdemo.html)
+════════════════════════════════════════════════════ -->
+<div class="sig-section">
+  <div class="sig-row" style="margin-bottom:20px;">
+    <div class="sig-col" style="flex:2;">
+      <div class="sig-line"></div>
+      <div class="sig-lbl">Pangalan / Lagda sa Ibabaw ng Nagrereklamo</div>
+    </div>
+  </div>
 
-<div class="sig-row">
-  <div class="sig-col" style="flex:2;">
-    <div class="sig-line"></div>
-    <div class="sig-lbl">Pangalan / Lagda sa Ibabaw ng Nagrereklamo</div>
-  </div>
-</div>
-<div class="sig-row">
-  <div class="sig-col">
-    <div class="sig-line"></div>
-    <div class="sig-lbl">Saksi (Witness)</div>
-  </div>
-  <div class="sig-col">
-    <div class="sig-line"></div>
-    <div class="sig-lbl">Saksi (Witness)</div>
-  </div>
-  <div class="sig-col">
-    <div class="sig-line"></div>
-    <div class="sig-lbl">Nagpatotoo: Kagawad on Duty</div>
+  <div class="sig-row">
+    <div class="sig-col">
+      <div class="sig-line"></div>
+      <div class="sig-lbl">SAKSI (Witness)</div>
+    </div>
+    <div class="sig-col">
+      <div class="sig-line"></div>
+      <div class="sig-lbl">SAKSI (Witness)</div>
+    </div>
+    <div class="sig-col">
+      <div class="sig-line"></div>
+      <div class="sig-lbl">NAGPATOTOO:<br>Kagawad on Duty</div>
+    </div>
   </div>
 </div>
 
-<div class="footer">Printed on: ${todayStr} &nbsp;|&nbsp; Barangay Tugtug E-System</div>
+${resBlock}
+
+<!-- ═══════════════════════════════════════════════════
+     PAGE FOOTER
+════════════════════════════════════════════════════ -->
+<div class="page-footer">
+  Printed on: ${todayStr} &nbsp;|&nbsp; Barangay Tugtug E-System &nbsp;|&nbsp; Ref: ${safe(rec.reference_number)}
+</div>
+
 </body></html>`);
     win.document.close();
     win.focus();
-    setTimeout(() => win.print(), 500);
+    setTimeout(() => win.print(), 600);
   };
 
   // ── Toast ─────────────────────────────────────────────────
+
+  // ── Print ALL blotter records (dashboard button) ─────────
+  function printAllRecords(records, counts) {
+    function safe(v) { return v ? String(v).replace(/</g,"&lt;").replace(/>/g,"&gt;") : "—"; }
+    function fmtD(d) {
+      if (!d) return "—";
+      return new Date(d).toLocaleDateString("en-PH", { year:"numeric", month:"short", day:"numeric" });
+    }
+    function fmtT(t) {
+      if (!t) return "—";
+      const [h, m] = String(t).split(":");
+      const hr = parseInt(h);
+      return `${hr % 12 || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`;
+    }
+    function td2() { return "padding:5px 7px;border:1px solid #d0d0d0;font-size:10.5px;vertical-align:top;"; }
+
+    const statusStyleMap = {
+      Pending:   "background:#fff3cd;color:#856404;border:1px solid #ffc107;",
+      Scheduled: "background:#cfe2ff;color:#084298;border:1px solid #0d6efd;",
+      Resolved:  "background:#d1e7dd;color:#0a3622;border:1px solid #198754;",
+      Escalated: "background:#e2d9f3;color:#4a235a;border:1px solid #8b5cf6;",
+    };
+
+    const rows = records.map((r, i) => {
+      const ss = statusStyleMap[r.status] || "background:#eee;color:#333;border:1px solid #aaa;";
+      return `<tr style="background:${i % 2 === 0 ? "#fafaf7" : "#f3efe8"};">
+        <td style="${td2()}">${safe(r.reference_number)}</td>
+        <td style="${td2()}">${safe(r.full_name)}</td>
+        <td style="${td2()}">${safe(r.age)}</td>
+        <td style="${td2()}">${safe(r.civil_status)}</td>
+        <td style="${td2()}">${safe(r.address)}</td>
+        <td style="${td2()}">${safe(r.complaint_against)}</td>
+        <td style="${td2()}">${safe(r.complaint_type)}</td>
+        <td style="${td2()}">${fmtD(r.petsa)}</td>
+        <td style="${td2()}">${fmtT(r.oras)}</td>
+        <td style="${td2()}">${safe(r.status)}</td>
+        <td style="${td2()};max-width:160px;">${safe(r.complaint_details)}</td>
+      </tr>`;
+    }).join("");
+
+    const todayStr = new Date().toLocaleDateString("en-PH", { year:"numeric", month:"long", day:"numeric" });
+    const c = counts || {};
+
+    const win = window.open("", "_blank", "width=1150,height=820");
+    win.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Barangay Blotter — All Records</title>
+<style>
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Times New Roman',Times,serif; font-size:11px; color:#000; background:#fff; padding:28px 36px; }
+  @media print {
+    body { padding:0; }
+    @page { size: A3 landscape; margin: 1.2cm 1.5cm; }
+    .no-print { display:none !important; }
+  }
+  .print-btn {
+    display:block; margin:0 auto 18px; padding:9px 28px;
+    background:#032f15; color:#fff; border:none; border-radius:6px;
+    font-size:13px; font-weight:bold; cursor:pointer; letter-spacing:1px;
+  }
+  .print-btn:hover { background:#054d22; }
+  .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .header-logo { width:60px; height:auto; }
+  .header-text { flex:1; text-align:center; }
+  .header-text .sm   { font-size:9.5px; margin:1px 0; }
+  .header-text .brgy { font-size:18px; font-weight:bold; color:#032f15; margin:2px 0; }
+  .header-text .off  { font-size:11px; font-weight:bold; }
+  .report-title {
+    text-align:center; font-size:13px; font-weight:bold; letter-spacing:2px;
+    border-top:2px solid #000; border-bottom:2px solid #000;
+    padding:4px 0; margin:6px 0 12px;
+  }
+  .summary-bar {
+    display:table; width:100%; border-collapse:collapse;
+    border:1px solid #c8c8c8; border-radius:4px; margin-bottom:12px;
+    background:#f9f9f4;
+  }
+  .sum-card {
+    display:table-cell; text-align:center; padding:5px 10px;
+    border-right:1px solid #ddd; vertical-align:middle;
+  }
+  .sum-card:last-child { border-right:none; }
+  .sum-card .num { font-size:13px; font-weight:bold; color:#032f15; display:inline; }
+  .sum-card .lbl { font-size:9.5px; text-transform:uppercase; color:#555; letter-spacing:0.4px; display:inline; margin-left:4px; }
+  table { width:100%; border-collapse:collapse; }
+  thead tr { background:#273b07; color:#f3efe8; }
+  thead th { padding:6px 7px; text-align:left; font-size:10px; font-weight:600; white-space:nowrap; border:1px solid #1a2d05; }
+  .footer { margin-top:14px; padding-top:6px; border-top:1px solid #ccc; font-size:9px; color:#888; text-align:center; }
+</style>
+</head>
+<body>
+<button class="print-btn no-print" onclick="window.print()">&#128424;&#65039; Print / Save as PDF</button>
+
+<div class="header">
+  <img class="header-logo" src="../photos/logo.png.png" alt="Logo" onerror="this.style.display='none'">
+  <div class="header-text">
+    <p class="sm">Republic of the Philippines &nbsp;|&nbsp; PROVINCE OF BATANGAS &nbsp;|&nbsp; Municipality of San Jose</p>
+    <p class="brgy">Barangay Tugtug</p>
+    <p class="off">OFFICE OF THE PUNONG BARANGAY</p>
+  </div>
+  <div style="min-width:70px;text-align:right;font-size:9px;color:#555;">
+    Printed:<br><strong>${todayStr}</strong>
+  </div>
+</div>
+
+<div class="report-title">BARANGAY BLOTTER — ALL RECORDS</div>
+
+<div class="summary-bar">
+  <div class="sum-card"><span class="num">${c.Total || 0}</span> <span class="lbl">Total Records</span></div>
+  <div class="sum-card"><span class="num">${c.Pending || 0}</span> <span class="lbl">Pending</span></div>
+  <div class="sum-card"><span class="num">${c.Scheduled || 0}</span> <span class="lbl">Scheduled</span></div>
+  <div class="sum-card"><span class="num">${c.Resolved || 0}</span> <span class="lbl">Resolved</span></div>
+  <div class="sum-card"><span class="num">${c.Escalated || 0}</span> <span class="lbl">Escalated</span></div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Ref No.</th>
+      <th>Full Name</th>
+      <th>Age</th>
+      <th>Civil Status</th>
+      <th>Address</th>
+      <th>Complaint Against</th>
+      <th>Complaint Type</th>
+      <th>Date (Petsa)</th>
+      <th>Time (Oras)</th>
+      <th>Status</th>
+      <th>Complaint Details</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<div class="footer">
+  Total Records: ${records.length} &nbsp;|&nbsp; Barangay Tugtug E-System &nbsp;|&nbsp; Printed on: ${todayStr}
+</div>
+</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 600);
+  }
+
   function showToast(msg) {
     const ex = document.querySelector(".toast");
     if (ex) ex.remove();
