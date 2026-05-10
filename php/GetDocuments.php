@@ -17,7 +17,8 @@ define("DB_USER", "root");
 define("DB_PASS", "");
 define("DB_CHARSET", "utf8mb4");
 
-$dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+$dsn =
+    "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -37,10 +38,10 @@ try {
 }
 
 if ($_SERVER["REQUEST_METHOD"] === "GET") {
-    $search    = isset($_GET["search"])    ? trim($_GET["search"])    : "";
-    $filter    = isset($_GET["filter"])    ? trim($_GET["filter"])    : "";
+    $search = isset($_GET["search"]) ? trim($_GET["search"]) : "";
+    $filter = isset($_GET["filter"]) ? trim($_GET["filter"]) : "";
     $date_from = isset($_GET["date_from"]) ? trim($_GET["date_from"]) : "";
-    $date_to   = isset($_GET["date_to"])   ? trim($_GET["date_to"])   : "";
+    $date_to = isset($_GET["date_to"]) ? trim($_GET["date_to"]) : "";
 
     $sql = "SELECT
                 dr.request_ID,
@@ -59,7 +60,12 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
                 dr.date,
                 dr.status,
                 dr.date_released,
-                dr.quantity
+                dr.id_image_path,
+                dr.quantity,
+                dr.age,
+                dr.length_stay_years,
+                dr.length_stay_months
+
             FROM document_request dr
             LEFT JOIN resident_information ri ON dr.resident_ID = ri.resident_ID
             LEFT JOIN documents d ON dr.document_ID = d.document_ID
@@ -117,25 +123,25 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
         unset($row);
 
         $countStmt = $pdo->query(
-            "SELECT status, COUNT(*) as count FROM document_request GROUP BY status"
+            "SELECT status, COUNT(*) as count FROM document_request GROUP BY status",
         );
         $counts = [
-            "Total"      => 0,
-            "Pending"    => 0,
+            "Total" => 0,
+            "Pending" => 0,
             "Processing" => 0,
-            "Ready"      => 0,
-            "Released"   => 0,
-            "Canceled"   => 0,
+            "Ready" => 0,
+            "Released" => 0,
+            "Canceled" => 0,
         ];
         while ($row = $countStmt->fetch()) {
             $counts[$row["status"]] = (int) $row["count"];
-            $counts["Total"]       += (int) $row["count"];
+            $counts["Total"] += (int) $row["count"];
         }
 
         echo json_encode([
             "success" => true,
             "records" => $records,
-            "counts"  => $counts,
+            "counts" => $counts,
         ]);
     } catch (PDOException $e) {
         error_log("Query error: " . $e->getMessage());
@@ -157,7 +163,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         exit();
     }
 
-    $allowedStatuses = ["Pending", "Processing", "Ready", "Released", "Canceled"];
+    $allowedStatuses = [
+        "Pending",
+        "Processing",
+        "Ready",
+        "Released",
+        "Canceled",
+    ];
     if (!in_array($data["status"], $allowedStatuses)) {
         echo json_encode(["success" => false, "message" => "Invalid status."]);
         exit();
@@ -168,10 +180,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $date_released = null;
         } elseif ($data["status"] === "Released") {
             if (!empty($data["date_released"])) {
-                $d = DateTime::createFromFormat("Y-m-d", $data["date_released"]);
-                $date_released = ($d && $d->format("Y-m-d") === $data["date_released"])
-                    ? $data["date_released"]
-                    : date("Y-m-d");
+                $d = DateTime::createFromFormat(
+                    "Y-m-d",
+                    $data["date_released"],
+                );
+                $date_released =
+                    $d && $d->format("Y-m-d") === $data["date_released"]
+                        ? $data["date_released"]
+                        : date("Y-m-d");
             } else {
                 $date_released = date("Y-m-d");
             }
@@ -182,18 +198,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt = $pdo->prepare(
             "UPDATE document_request
              SET status = :status, date_released = :date_released
-             WHERE request_ID = :id"
+             WHERE request_ID = :id",
         );
 
         $stmt->execute([
-            ":status"        => $data["status"],
+            ":status" => $data["status"],
             ":date_released" => $date_released,
-            ":id"            => $data["request_ID"],
+            ":id" => $data["request_ID"],
         ]);
 
         echo json_encode([
-            "success"       => true,
-            "message"       => "Status updated successfully.",
+            "success" => true,
+            "message" => "Status updated successfully.",
             "date_released" => $date_released,
         ]);
     } catch (PDOException $e) {
