@@ -61,7 +61,11 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
                 dr.status,
                 dr.date_released,
                 dr.id_image_path,
-                dr.quantity
+                dr.quantity,
+                dr.age,
+                dr.length_stay_years,
+                dr.length_stay_months
+
             FROM document_request dr
             LEFT JOIN resident_information ri ON dr.resident_ID = ri.resident_ID
             LEFT JOIN documents d ON dr.document_ID = d.document_ID

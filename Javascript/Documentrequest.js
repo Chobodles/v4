@@ -460,10 +460,17 @@ document.addEventListener("DOMContentLoaded", function () {
                 </div>`;
     }
 
-    const priceDisplay =
-      !rec.price || rec.price == 0
-        ? '<span style="color:#0a3622;font-weight:700;">Free</span>'
-        : `<span style="color:#0a3622;font-weight:700;">₱${parseFloat(rec.price).toFixed(2)}</span>`;
+    const unitPrice = parseFloat(rec.price) || 0;
+    const qty = parseInt(rec.quantity) || 1;
+    const total = unitPrice * qty;
+
+    const priceRow =
+      unitPrice === 0 ? "Free (₱0.00)" : "\u20B1" + unitPrice.toFixed(2);
+
+    const totalLabel = unitPrice === 0 ? "Total" : "Total (\u00D7" + qty + ")";
+
+    const totalRow =
+      unitPrice === 0 ? "Free (₱0.00)" : "\u20B1" + total.toFixed(2);
 
     const sc = statusColors[rec.status] || {
       bg: "#eee",
@@ -532,10 +539,11 @@ document.addEventListener("DOMContentLoaded", function () {
                     ${field("Age", rec.age)}
                     ${field("Length of Stay", (rec.length_stay_years || 0) + " yr(s) " + (rec.length_stay_months || 0) + " mo(s)")}
                     ${field("Quantity", rec.quantity)}
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.8vh 0;">
-                        <span style="font-size:1.4vh;color:#666;font-weight:600;min-width:40%;">Price</span>
-                        ${priceDisplay}
-                    </div>
+                    ${field("Quantity", rec.quantity)}
+                    ${field("Unit Price", priceRow)}
+                    ${field(totalLabel, totalRow)}
+
+
                 </div>
 
                 <div style="background:${isReleased ? "#f3e8ff" : "#fff8e6"};border-radius:10px;padding:1.5vh 1.5vw;margin-bottom:2vh;
