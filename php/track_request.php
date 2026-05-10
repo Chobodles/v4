@@ -2,14 +2,19 @@
 // ============================================================
 //  Barangay Tugtug E-System — Track Request
 //  File: php/track_request.php
-//  GET ?ref=BRGY-2026-1234  or  ?ref=DOC-2026-1234
+//  Updated to match db-barangay-system schema:
+//  - No blotter_reference_number or blotter_details tables;
+//    blotter queried directly by reference_number column
+//  - No document_reference_number table;
+//    document_request queried directly by document_refnumber column
+//  GET ?ref=BRGY-2026-XXXXX  or  ?ref=DOC-2026-XXXXX
 // ============================================================
 header("Content-Type: application/json");
 ini_set("display_errors", 0);
 ini_set("log_errors", 1);
 
 define("DB_HOST",    "localhost");
-define("DB_NAME",    "db_barangay_e-system");
+define("DB_NAME",    "db-barangay-system");
 define("DB_USER",    "root");
 define("DB_PASS",    "");
 define("DB_CHARSET", "utf8mb4");
@@ -18,7 +23,6 @@ $dsn = "mysql:host=".DB_HOST.";dbname=".DB_NAME.";charset=".DB_CHARSET;
 $opt = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    // ✅ Must be true to avoid named param issues
     PDO::ATTR_EMULATE_PREPARES   => true,
 ];
 
@@ -40,18 +44,30 @@ if (empty($ref)) {
 if (str_starts_with($ref, "BRGY-")) {
 
     // ── Blotter lookup ────────────────────────────────────────
+    // Query directly on blotter.reference_number (no junction table).
     try {
         $stmt = $pdo->prepare(
-            "SELECT b.blotter_id, b.full_name, b.complaint_against,
-                    b.petsa, b.status, b.complaint_details,
-                    b.reference_number,
-                    bd.schedule_date_1, bd.schedule_time_1,
-                    bd.schedule_date_2, bd.schedule_time_2,
-                    bd.schedule_date_3, bd.schedule_time_3
-             FROM blotter_reference_number br
-             JOIN blotter_details bd ON br.detail_id  = bd.detail_id
-             JOIN blotter b          ON bd.blotter_id = b.blotter_id
-             WHERE br.blotter_refnumber = :ref
+            "SELECT
+                b.blotter_id,
+                b.reference_number,
+                b.first_name,
+                b.middle_name,
+                b.last_name,
+                b.suffix,
+                CONCAT(
+                    b.first_name,
+                    CASE WHEN b.middle_name IS NOT NULL AND b.middle_name <> '' THEN CONCAT(' ', b.middle_name) ELSE '' END,
+                    ' ',
+                    b.last_name,
+                    CASE WHEN b.suffix IS NOT NULL AND b.suffix <> '' THEN CONCAT(' ', b.suffix) ELSE '' END
+                ) AS full_name,
+                b.complaint_against,
+                b.petsa,
+                b.status,
+                b.complaint_details,
+                b.resolved_at
+             FROM blotter b
+             WHERE b.reference_number = :ref
              LIMIT 1"
         );
         $stmt->execute([":ref" => $ref]);
@@ -60,6 +76,12 @@ if (str_starts_with($ref, "BRGY-")) {
         if (!$row) {
             echo json_encode(["success" => false, "message" => "Reference number not found."]);
             exit;
+        }
+
+        // Fix zero-dates
+        $resolvedAt = $row["resolved_at"];
+        if ($resolvedAt === "0000-00-00" || $resolvedAt === "0000-00-00 00:00:00") {
+            $resolvedAt = null;
         }
 
         echo json_encode([
@@ -73,12 +95,15 @@ if (str_starts_with($ref, "BRGY-")) {
                 "complaint"        => $row["complaint_details"],
                 "status"           => $row["status"],
                 "price"            => "Free",
-                "schedule_date_1"  => $row["schedule_date_1"],
-                "schedule_time_1"  => $row["schedule_time_1"],
-                "schedule_date_2"  => $row["schedule_date_2"],
-                "schedule_time_2"  => $row["schedule_time_2"],
-                "schedule_date_3"  => $row["schedule_date_3"],
-                "schedule_time_3"  => $row["schedule_time_3"],
+                "resolved_at"      => $resolvedAt,
+                // Schedule fields no longer exist in this schema;
+                // return null so front-end gracefully hides them.
+                "schedule_date_1"  => null,
+                "schedule_time_1"  => null,
+                "schedule_date_2"  => null,
+                "schedule_time_2"  => null,
+                "schedule_date_3"  => null,
+                "schedule_time_3"  => null,
             ]
         ]);
     } catch (PDOException $e) {
@@ -89,25 +114,25 @@ if (str_starts_with($ref, "BRGY-")) {
 } elseif (str_starts_with($ref, "DOC-")) {
 
     // ── Document lookup ───────────────────────────────────────
-    // ✅ JOIN documents table to get document_type and price directly from DB
+    // Query directly on document_request.document_refnumber (no junction table).
     try {
         $stmt = $pdo->prepare(
-            "SELECT dr.request_ID,
-                    ri.first_name,
-                    ri.last_name,
-                    dr.document_purpose,
-                    dr.date,
-                    dr.status,
-                    dr.date_released,
-                    dr.quantity,
-                    dn.document_refnumber,
-                    d.document_type,
-                    d.price
-             FROM document_reference_number dn
-             JOIN document_request dr      ON dn.request_ID  = dr.request_ID
-             JOIN resident_information ri  ON dr.resident_ID = ri.resident_ID
-             LEFT JOIN documents d         ON dr.document_ID = d.document_ID
-             WHERE dn.document_refnumber = :ref
+            "SELECT
+                dr.request_ID,
+                dr.document_refnumber,
+                ri.first_name,
+                ri.last_name,
+                dr.document_purpose,
+                dr.date,
+                dr.status,
+                dr.date_released,
+                dr.quantity,
+                d.document_type,
+                d.price
+             FROM document_request dr
+             JOIN resident_information ri ON dr.resident_ID = ri.resident_ID
+             LEFT JOIN documents d        ON dr.document_ID = d.document_ID
+             WHERE dr.document_refnumber = :ref
              LIMIT 1"
         );
         $stmt->execute([":ref" => $ref]);
@@ -118,13 +143,13 @@ if (str_starts_with($ref, "BRGY-")) {
             exit;
         }
 
-        // ✅ Format price from DB: 0 = Free, otherwise show ₱ amount
-        $rawPrice    = $row["price"] ?? 0;
+        // Format price
+        $rawPrice     = $row["price"] ?? 0;
         $priceDisplay = ($rawPrice == 0)
             ? "Free"
             : "₱" . number_format((float)$rawPrice, 2);
 
-        // ✅ Fix zero date_released from MySQL
+        // Fix zero date_released
         $dateReleased = $row["date_released"];
         if ($dateReleased === "0000-00-00" || $dateReleased === "0000-00-00 00:00:00") {
             $dateReleased = null;
@@ -151,7 +176,7 @@ if (str_starts_with($ref, "BRGY-")) {
     }
 
 } else {
-    echo json_encode(["success" => false, "message" => "Invalid reference number format. Use BRGY-YEAR-XXXX or DOC-YEAR-XXXX."]);
+    echo json_encode(["success" => false, "message" => "Invalid reference number format. Use BRGY-YEAR-XXXXX or DOC-YEAR-XXXXX."]);
 }
 exit;
 ?>

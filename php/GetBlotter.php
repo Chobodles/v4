@@ -2,6 +2,8 @@
 // ============================================================
 //  Barangay Tugtug E-System — Get / Update Blotter Records
 //  File: php/GetBlotter.php
+//  Updated to match db-barangay-system schema (no blotter_details,
+//  no blotter_reference_number; uses first_name/last_name columns)
 // ============================================================
 
 header("Content-Type: application/json");
@@ -11,7 +13,7 @@ ini_set("log_errors", 1);
 error_reporting(E_ALL);
 
 define("DB_HOST",    "localhost");
-define("DB_NAME",    "db_barangay_e-system");
+define("DB_NAME",    "db-barangay-system");
 define("DB_USER",    "root");
 define("DB_PASS",    "");
 define("DB_CHARSET", "utf8mb4");
@@ -33,7 +35,7 @@ try {
 }
 
 // ============================================================
-//  GET — Fetch all blotter records (with details joined)
+//  GET — Fetch all blotter records
 // ============================================================
 if ($_SERVER["REQUEST_METHOD"] === "GET") {
     $search    = isset($_GET["search"])    ? trim($_GET["search"])    : "";
@@ -45,7 +47,17 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
         SELECT
             b.blotter_id,
             b.reference_number,
-            b.full_name,
+            b.first_name,
+            b.middle_name,
+            b.last_name,
+            b.suffix,
+            CONCAT(
+                b.first_name,
+                CASE WHEN b.middle_name IS NOT NULL AND b.middle_name <> '' THEN CONCAT(' ', b.middle_name) ELSE '' END,
+                ' ',
+                b.last_name,
+                CASE WHEN b.suffix IS NOT NULL AND b.suffix <> '' THEN CONCAT(' ', b.suffix) ELSE '' END
+            ) AS full_name,
             b.age,
             b.civil_status,
             b.address,
@@ -55,38 +67,23 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
             b.complaint_against,
             b.complaint_type,
             b.complaint_details,
-            b.submitted_at,
+            b.id_image_path,
             b.status,
-            bd.detail_id,
-            bd.schedule_date_1,
-            bd.schedule_time_1,
-            bd.schedule_details_1,
-            bd.schedule_outcome_1,
-            bd.schedule_date_2,
-            bd.schedule_time_2,
-            bd.schedule_details_2,
-            bd.schedule_outcome_2,
-            bd.schedule_date_3,
-            bd.schedule_time_3,
-            bd.schedule_details_3,
-            bd.schedule_outcome_3,
-            bd.resolution_notes,
-            bd.resolved_at,
-            bd.presiding_kagawad,
-            bd.secretary_name
+            b.resolved_at,
+            b.submitted_at
         FROM blotter b
-        LEFT JOIN blotter_details bd ON b.blotter_id = bd.blotter_id
         WHERE 1=1";
 
     $params = [];
 
     if (!empty($search)) {
         $sql .= " AND (
-            b.full_name            LIKE :search1
-            OR b.complaint_against LIKE :search2
-            OR b.complaint_type    LIKE :search3
-            OR b.reference_number  LIKE :search4
-            OR b.status            LIKE :search5
+            b.first_name       LIKE :search1
+            OR b.last_name     LIKE :search2
+            OR b.complaint_against LIKE :search3
+            OR b.complaint_type    LIKE :search4
+            OR b.reference_number  LIKE :search5
+            OR b.status            LIKE :search6
         )";
         $like = "%" . $search . "%";
         $params[":search1"] = $like;
@@ -94,6 +91,7 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
         $params[":search3"] = $like;
         $params[":search4"] = $like;
         $params[":search5"] = $like;
+        $params[":search6"] = $like;
     }
 
     if (!empty($filter) && $filter !== "Total" && $filter !== "date") {
@@ -119,8 +117,7 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
 
         // Fix zero-dates from MySQL
         foreach ($records as &$row) {
-            foreach (["petsa", "submitted_at", "resolved_at",
-                      "schedule_date_1", "schedule_date_2", "schedule_date_3"] as $col) {
+            foreach (["petsa", "submitted_at", "resolved_at"] as $col) {
                 if (isset($row[$col]) && (
                     $row[$col] === "0000-00-00" ||
                     $row[$col] === "0000-00-00 00:00:00"
@@ -139,8 +136,10 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
             "Total"     => 0,
             "Pending"   => 0,
             "Scheduled" => 0,
+            "Ongoing"   => 0,
             "Resolved"  => 0,
             "Escalated" => 0,
+            "Dismissed" => 0,
         ];
         while ($row = $countStmt->fetch()) {
             $counts[$row["status"]] = (int) $row["count"];
@@ -160,7 +159,9 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
 }
 
 // ============================================================
-//  POST — Update status, schedule, or unlock
+//  POST — Update blotter status / resolution
+//  NOTE: blotter_details and blotter_reference_number tables
+//  no longer exist in this schema. All data lives in `blotter`.
 // ============================================================
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $body = file_get_contents("php://input");
@@ -175,104 +176,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $blotterId = (int) $data["blotter_id"];
     $action    = $data["action"] ?? "update_status";
 
-    // ── ACTION: save_schedule ─────────────────────────────────
-    if ($action === "save_schedule") {
-        $n        = (int)   ($data["schedule_number"]  ?? 0);
-        $date     = trim($data["schedule_date"]        ?? "");
-        $time     = trim($data["schedule_time"]        ?? "");
-        $details  = trim($data["schedule_details"]     ?? "");
-        $outcome  = trim($data["schedule_outcome"]     ?? "");
-
-        if ($n < 1 || $n > 3 || !$date || !$time || !$outcome) {
-            echo json_encode(["success" => false, "message" => "Missing schedule fields."]);
-            exit();
-        }
-
-        $allowedOutcomes = [
-            "Appeared - Resolved",
-            "Appeared - Rescheduled",
-            "Did Not Appear - No Response",
-            "Resolved",
-            "Escalated",
-            // Legacy DB enum values (kept for backward compatibility)
-            "Appeared",
-            "Did Not Appear",
-            "Rescheduled",
-            "No Response"
-        ];
-        if (!in_array($outcome, $allowedOutcomes)) {
-            echo json_encode(["success" => false, "message" => "Invalid outcome."]);
-            exit();
-        }
-
-        try {
-            // Ensure blotter_details row exists
-            $check = $pdo->prepare("SELECT detail_id FROM blotter_details WHERE blotter_id = :bid LIMIT 1");
-            $check->execute([":bid" => $blotterId]);
-            $detail = $check->fetch();
-
-            if (!$detail) {
-                // Get the reference number for this blotter to store in blotter_details
-                $refLookup = $pdo->prepare("SELECT reference_number FROM blotter WHERE blotter_id = :bid LIMIT 1");
-                $refLookup->execute([":bid" => $blotterId]);
-                $refRow = $refLookup->fetch();
-                $refNum = $refRow ? $refRow["reference_number"] : null;
-
-                $ins = $pdo->prepare(
-                    "INSERT INTO blotter_details (blotter_refnumber, blotter_id, created_at, updated_at)
-                     VALUES (:ref, :bid, NOW(), NOW())"
-                );
-                $ins->execute([":ref" => $refNum, ":bid" => $blotterId]);
-                $detailId = $pdo->lastInsertId();
-
-                // Update blotter_reference_number using blotter_refnumber as the key
-                if ($refNum) {
-                    $updRef = $pdo->prepare(
-                        "UPDATE blotter_reference_number SET detail_id = :did WHERE blotter_refnumber = :ref"
-                    );
-                    $updRef->execute([":did" => $detailId, ":ref" => $refNum]);
-                }
-            }
-
-            $sql = "UPDATE blotter_details SET
-                        schedule_date_{$n}    = :date,
-                        schedule_time_{$n}    = :time,
-                        schedule_details_{$n} = :details,
-                        schedule_outcome_{$n} = :outcome,
-                        updated_at            = NOW()
-                    WHERE blotter_id = :bid";
-
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([
-                ":date"    => $date,
-                ":time"    => $time,
-                ":details" => $details,
-                ":outcome" => $outcome,
-                ":bid"     => $blotterId,
-            ]);
-
-            // Auto-update main blotter status to Scheduled when a schedule is saved
-            $mainStatus = $pdo->prepare("SELECT status FROM blotter WHERE blotter_id = :bid");
-            $mainStatus->execute([":bid" => $blotterId]);
-            $current = $mainStatus->fetchColumn();
-
-            if ($current === "Pending") {
-                $updMain = $pdo->prepare("UPDATE blotter SET status = 'Scheduled' WHERE blotter_id = :bid");
-                $updMain->execute([":bid" => $blotterId]);
-            }
-
-            echo json_encode(["success" => true, "message" => "Schedule saved."]);
-        } catch (PDOException $e) {
-            error_log("Schedule save error: " . $e->getMessage());
-            echo json_encode(["success" => false, "message" => "Failed to save schedule."]);
-        }
-        exit();
-    }
-
     // ── ACTION: update_status ─────────────────────────────────
     if ($action === "update_status") {
-        $newStatus = trim($data["status"] ?? "");
-        $allowedStatuses = ["Pending", "Scheduled", "Resolved", "Escalated"];
+        $newStatus       = trim($data["status"] ?? "");
+        $allowedStatuses = ["Pending", "Scheduled", "Ongoing", "Resolved", "Escalated", "Dismissed"];
 
         if (!in_array($newStatus, $allowedStatuses)) {
             echo json_encode(["success" => false, "message" => "Invalid status."]);
@@ -280,63 +187,28 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
 
         $resolvedAt = null;
-        $resNotes   = trim($data["resolution_notes"]   ?? "");
-        $kagawad    = trim($data["presiding_kagawad"]  ?? "");
-        $secretary  = trim($data["secretary_name"]     ?? "");
-
-        if ($newStatus === "Resolved" || $newStatus === "Escalated") {
+        if (in_array($newStatus, ["Resolved", "Escalated", "Dismissed"])) {
             if (!empty($data["resolved_at"])) {
                 $d = DateTime::createFromFormat("Y-m-d", $data["resolved_at"]);
                 $resolvedAt = ($d && $d->format("Y-m-d") === $data["resolved_at"])
-                    ? $data["resolved_at"]
-                    : date("Y-m-d");
+                    ? $data["resolved_at"] . " " . date("H:i:s")
+                    : date("Y-m-d H:i:s");
             } else {
-                $resolvedAt = date("Y-m-d");
+                $resolvedAt = date("Y-m-d H:i:s");
             }
         }
 
         try {
-            // Update main status
             $stmt = $pdo->prepare(
-                "UPDATE blotter SET status = :status WHERE blotter_id = :bid"
+                "UPDATE blotter
+                 SET status = :status, resolved_at = :resolved_at
+                 WHERE blotter_id = :bid"
             );
-            $stmt->execute([":status" => $newStatus, ":bid" => $blotterId]);
-
-            // Update blotter_details resolution fields
-            if ($newStatus === "Resolved" || $newStatus === "Escalated") {
-                // Ensure blotter_details row exists
-                $check = $pdo->prepare("SELECT detail_id FROM blotter_details WHERE blotter_id = :bid LIMIT 1");
-                $check->execute([":bid" => $blotterId]);
-                if (!$check->fetch()) {
-                    $refLookup = $pdo->prepare("SELECT reference_number FROM blotter WHERE blotter_id = :bid LIMIT 1");
-                    $refLookup->execute([":bid" => $blotterId]);
-                    $refRow = $refLookup->fetch();
-                    $refNum = $refRow ? $refRow["reference_number"] : null;
-
-                    $ins = $pdo->prepare(
-                        "INSERT INTO blotter_details (blotter_refnumber, blotter_id, created_at, updated_at)
-                         VALUES (:ref, :bid, NOW(), NOW())"
-                    );
-                    $ins->execute([":ref" => $refNum, ":bid" => $blotterId]);
-                }
-
-                $updDet = $pdo->prepare(
-                    "UPDATE blotter_details SET
-                        resolution_notes  = :notes,
-                        resolved_at       = :rat,
-                        presiding_kagawad = :kagawad,
-                        secretary_name    = :sec,
-                        updated_at        = NOW()
-                    WHERE blotter_id = :bid"
-                );
-                $updDet->execute([
-                    ":notes"   => $resNotes   ?: null,
-                    ":rat"     => $resolvedAt,
-                    ":kagawad" => $kagawad    ?: null,
-                    ":sec"     => $secretary  ?: null,
-                    ":bid"     => $blotterId,
-                ]);
-            }
+            $stmt->execute([
+                ":status"      => $newStatus,
+                ":resolved_at" => $resolvedAt,
+                ":bid"         => $blotterId,
+            ]);
 
             echo json_encode(["success" => true, "message" => "Status updated."]);
         } catch (PDOException $e) {
@@ -346,13 +218,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         exit();
     }
 
-    // ── ACTION: clear_locked (unlock) ─────────────────────────
+    // ── ACTION: clear_locked (reset resolved_at) ──────────────
     if (!empty($data["clear_locked"])) {
         try {
             $stmt = $pdo->prepare(
-                "UPDATE blotter_details SET
-                    resolved_at = NULL, updated_at = NOW()
-                 WHERE blotter_id = :bid"
+                "UPDATE blotter SET resolved_at = NULL WHERE blotter_id = :bid"
             );
             $stmt->execute([":bid" => $blotterId]);
 

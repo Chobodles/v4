@@ -2,6 +2,7 @@
 // ============================================================
 //  Barangay Tugtug E-System — Get Document Records
 //  File: php/GetDocuments.php
+//  Updated DB name to match db-barangay-system schema.
 // ============================================================
 
 header("Content-Type: application/json");
@@ -11,13 +12,12 @@ ini_set("log_errors", 1);
 error_reporting(E_ALL);
 
 define("DB_HOST", "localhost");
-define("DB_NAME", "db_barangay_e-system");
+define("DB_NAME", "db-barangay-system");
 define("DB_USER", "root");
 define("DB_PASS", "");
 define("DB_CHARSET", "utf8mb4");
 
-$dsn =
-    "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+$dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -37,10 +37,10 @@ try {
 }
 
 if ($_SERVER["REQUEST_METHOD"] === "GET") {
-    $search = isset($_GET["search"]) ? trim($_GET["search"]) : "";
-    $filter = isset($_GET["filter"]) ? trim($_GET["filter"]) : "";
+    $search    = isset($_GET["search"])    ? trim($_GET["search"])    : "";
+    $filter    = isset($_GET["filter"])    ? trim($_GET["filter"])    : "";
     $date_from = isset($_GET["date_from"]) ? trim($_GET["date_from"]) : "";
-    $date_to = isset($_GET["date_to"]) ? trim($_GET["date_to"]) : "";
+    $date_to   = isset($_GET["date_to"])   ? trim($_GET["date_to"])   : "";
 
     $sql = "SELECT
                 dr.request_ID,
@@ -104,7 +104,7 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
         $stmt->execute($params);
         $records = $stmt->fetchAll();
 
-        // Fix zero-dates from MySQL: treat "0000-00-00" as null so JS shows dash
+        // Fix zero-dates from MySQL
         foreach ($records as &$row) {
             if (
                 isset($row["date_released"]) &&
@@ -117,24 +117,25 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
         unset($row);
 
         $countStmt = $pdo->query(
-            "SELECT status, COUNT(*) as count FROM document_request GROUP BY status",
+            "SELECT status, COUNT(*) as count FROM document_request GROUP BY status"
         );
         $counts = [
-            "Total" => 0,
-            "Pending" => 0,
+            "Total"      => 0,
+            "Pending"    => 0,
             "Processing" => 0,
-            "Ready" => 0,
-            "Released" => 0,
+            "Ready"      => 0,
+            "Released"   => 0,
+            "Canceled"   => 0,
         ];
         while ($row = $countStmt->fetch()) {
             $counts[$row["status"]] = (int) $row["count"];
-            $counts["Total"] += (int) $row["count"];
+            $counts["Total"]       += (int) $row["count"];
         }
 
         echo json_encode([
             "success" => true,
             "records" => $records,
-            "counts" => $counts,
+            "counts"  => $counts,
         ]);
     } catch (PDOException $e) {
         error_log("Query error: " . $e->getMessage());
@@ -156,30 +157,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         exit();
     }
 
-    // 1. Add "Released" to your allowed statuses array
-    $allowedStatuses = ["Pending", "Processing", "Ready", "Released"];
+    $allowedStatuses = ["Pending", "Processing", "Ready", "Released", "Canceled"];
     if (!in_array($data["status"], $allowedStatuses)) {
         echo json_encode(["success" => false, "message" => "Invalid status."]);
         exit();
     }
 
     try {
-
-        // If JS sent clear_date_released = true (user clicked Unlock),
-        // force date_released to NULL right away regardless of status.
-        // Otherwise: if Released, use the manually chosen date sent from JS
-        // (falls back to today if somehow not provided). Null for all other statuses.
         if (!empty($data["clear_date_released"])) {
             $date_released = null;
         } elseif ($data["status"] === "Released") {
             if (!empty($data["date_released"])) {
-                // Validate it's a real YYYY-MM-DD date before using it
                 $d = DateTime::createFromFormat("Y-m-d", $data["date_released"]);
                 $date_released = ($d && $d->format("Y-m-d") === $data["date_released"])
                     ? $data["date_released"]
-                    : date("Y-m-d"); // fallback to today if malformed
+                    : date("Y-m-d");
             } else {
-                $date_released = date("Y-m-d"); // fallback if JS somehow omits it
+                $date_released = date("Y-m-d");
             }
         } else {
             $date_released = null;
@@ -188,19 +182,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt = $pdo->prepare(
             "UPDATE document_request
              SET status = :status, date_released = :date_released
-             WHERE request_ID = :id",
+             WHERE request_ID = :id"
         );
 
         $stmt->execute([
-            ":status" => $data["status"],
+            ":status"        => $data["status"],
             ":date_released" => $date_released,
-            ":id" => $data["request_ID"],
+            ":id"            => $data["request_ID"],
         ]);
 
         echo json_encode([
-            "success" => true,
-            "message" => "Status updated successfully.",
-            "date_released" => $date_released // Optional: return to JS for UI update
+            "success"       => true,
+            "message"       => "Status updated successfully.",
+            "date_released" => $date_released,
         ]);
     } catch (PDOException $e) {
         error_log("Update error: " . $e->getMessage());

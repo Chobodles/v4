@@ -8,52 +8,37 @@ document.addEventListener("DOMContentLoaded", function () {
   // ── State ─────────────────────────────────────────────────
   let currentYear  = new Date().getFullYear();
   let currentMonth = new Date().getMonth(); // 0-indexed
-  let blotterScheduleDates = []; // Array of "YYYY-MM-DD" strings for future schedules
+  let blotterScheduleDates = []; // Array of "YYYY-MM-DD" strings
 
-  // ── Fetch blotter schedules, then render calendar ─────────
+  // ── Fetch blotter records, mark days with PENDING/SCHEDULED blotters ──
+  // NOTE: The blotter table has no schedule_date columns.
+  // We highlight dates that have active (non-resolved/non-escalated) blotter
+  // incidents filed on that petsa (incident date).
   function fetchBlotterSchedules(callback) {
     fetch("php/GetBlotter.php")
       .then(res => res.json())
       .then(data => {
         if (!data.success) { callback([]); return; }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const scheduledDates = [];
+        const activeDates = [];
 
         (data.records || []).forEach(rec => {
-          // Only consider records that are NOT resolved/escalated
-          if (rec.status === "Resolved" || rec.status === "Escalated") return;
+          // Only show indicator for open/active cases
+          if (rec.status === "Resolved" || rec.status === "Escalated" || rec.status === "Dismissed") return;
 
-          // Check schedule_date_1, _2, _3 — pick the latest one that is >= today
-          const sched = [
-            rec.schedule_date_1,
-            rec.schedule_date_2,
-            rec.schedule_date_3,
-          ].filter(d => d && d !== "0000-00-00");
+          // Use petsa (incident date) as the calendar indicator date
+          if (!rec.petsa || rec.petsa === "0000-00-00") return;
 
-          // Pick the most recent valid schedule (last non-null)
-          // Logic: find the last assigned schedule date
-          let nextDate = null;
-          for (let i = sched.length - 1; i >= 0; i--) {
-            const d = new Date(sched[i] + "T00:00:00");
-            if (!isNaN(d)) { nextDate = d; break; }
-          }
+          const d = new Date(rec.petsa + "T00:00:00");
+          if (isNaN(d)) return;
 
-          if (nextDate) {
-            nextDate.setHours(0, 0, 0, 0);
-            // Only show indicator if the schedule date is today or in the future
-            if (nextDate >= today) {
-              const yyyy = nextDate.getFullYear();
-              const mm   = String(nextDate.getMonth() + 1).padStart(2, "0");
-              const dd   = String(nextDate.getDate()).padStart(2, "0");
-              scheduledDates.push(`${yyyy}-${mm}-${dd}`);
-            }
-          }
+          const yyyy = d.getFullYear();
+          const mm   = String(d.getMonth() + 1).padStart(2, "0");
+          const dd   = String(d.getDate()).padStart(2, "0");
+          activeDates.push(`${yyyy}-${mm}-${dd}`);
         });
 
-        callback(scheduledDates);
+        callback(activeDates);
       })
       .catch(() => callback([]));
   }
@@ -76,7 +61,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const todayMon  = today.getMonth();
     const todayYear = today.getFullYear();
 
-    const firstDay   = new Date(year, month, 1).getDay(); // 0=Sun
+    const firstDay    = new Date(year, month, 1).getDay(); // 0=Sun
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
     // Empty cells for offset
@@ -99,7 +84,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const isToday = (d === todayDate && month === todayMon && year === todayYear);
       if (isToday) cell.classList.add("current-day");
 
-      // Check if this date has a blotter schedule
+      // Check if this date has an active blotter incident
       const hasSchedule = blotterScheduleDates.includes(dateStr);
 
       // Build cell content
@@ -107,7 +92,7 @@ document.addEventListener("DOMContentLoaded", function () {
         <span style="position:relative;display:inline-block;">
           ${d}
           ${hasSchedule ? `
-            <span title="Blotter hearing scheduled" style="
+            <span title="Active blotter filed on this date" style="
               position:absolute;
               top:-4px;
               right:-7px;
@@ -123,9 +108,8 @@ document.addEventListener("DOMContentLoaded", function () {
         </span>
       `;
 
-      // Tooltip on hover for schedule indicator
       if (hasSchedule) {
-        cell.title = "Blotter hearing on " + dateStr;
+        cell.title = "Active blotter filed on " + dateStr;
         cell.style.fontWeight = "700";
       }
 
@@ -161,7 +145,6 @@ document.addEventListener("DOMContentLoaded", function () {
           .slice(0, 5);
 
         if (sorted.length === 0) {
-          const label = container.querySelector(".dtitle");
           const empty = document.createElement("p");
           empty.style.cssText = `
             text-align:center;color:#888;font-family:'Segoe UI',sans-serif;
@@ -172,15 +155,15 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const list = document.createElement("div");
-        list.style.cssText = `
-          position:relative;
-          top:8%;
-          padding:0 5%;
-        `;
+        list.style.cssText = `position:relative;top:8%;padding:0 5%;`;
 
         sorted.forEach((rec, i) => {
-          const fullName = [rec.first_name, rec.middle_initial ? rec.middle_initial + "." : "", rec.last_name]
-            .filter(Boolean).join(" ");
+          // rec.first_name / rec.last_name / rec.middle_initial from the JOIN
+          const fullName = [
+            rec.first_name,
+            rec.middle_initial ? rec.middle_initial + "." : "",
+            rec.last_name
+          ].filter(Boolean).join(" ");
 
           const dateStr = rec.date
             ? new Date(rec.date + "T00:00:00").toLocaleDateString("en-PH", { year:"numeric", month:"short", day:"numeric" })
@@ -196,33 +179,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
           const row = document.createElement("div");
           row.style.cssText = `
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            padding:1.2vh 1vw;
-            border-bottom:1px solid rgba(0,0,0,0.07);
-            background:${i % 2 === 0 ? "#fcfaf7" : "#f3efe8"};
-            border-radius:8px;
-            margin-bottom:0.5vh;
-            gap:0.5vw;
-            transition:background 0.2s;
+            display:flex;align-items:center;justify-content:space-between;
+            padding:1.2vh 1vw;border-bottom:1px solid rgba(0,0,0,0.07);
+            background:${i % 2 === 0 ? "#fcfaf7" : "#f3efe8"};border-radius:8px;
+            margin-bottom:0.5vh;gap:0.5vw;transition:background 0.2s;
           `;
           row.onmouseover = () => row.style.background = "#e8f0d8";
           row.onmouseout  = () => row.style.background = i % 2 === 0 ? "#fcfaf7" : "#f3efe8";
 
           row.innerHTML = `
-            <span style="
-              font-family:'Segoe UI',sans-serif;font-size:1.35vh;
+            <span style="font-family:'Segoe UI',sans-serif;font-size:1.35vh;
               color:#375309;font-weight:700;min-width:30%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
               ${rec.document_refnumber || "—"}
             </span>
-            <span style="
-              font-family:'Segoe UI',sans-serif;font-size:1.35vh;
+            <span style="font-family:'Segoe UI',sans-serif;font-size:1.35vh;
               color:#273b07;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;">
               ${fullName || "—"}
             </span>
-            <span style="
-              font-size:1.2vh;padding:3px 8px;border-radius:20px;
+            <span style="font-size:1.2vh;padding:3px 8px;border-radius:20px;
               background:${sc.bg};color:${sc.color};font-weight:600;
               white-space:nowrap;font-family:'Segoe UI',sans-serif;">
               ${rec.status}
@@ -246,7 +220,7 @@ document.addEventListener("DOMContentLoaded", function () {
       .then(data => {
         if (!data.success || !data.records) return;
 
-        // Sort by submitted_at or petsa DESC, take top 5
+        // Sort by submitted_at DESC (falls back to petsa), take top 5
         const sorted = [...data.records]
           .sort((a, b) => {
             const da = new Date(b.submitted_at || b.petsa || 0);
@@ -266,51 +240,43 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const list = document.createElement("div");
-        list.style.cssText = `
-          position:relative;
-          top:8%;
-          padding:0 5%;
-        `;
+        list.style.cssText = `position:relative;top:8%;padding:0 5%;`;
 
         const statusColors = {
           Pending:   { bg: "#fff3cd", color: "#856404" },
           Scheduled: { bg: "#cfe2ff", color: "#084298" },
+          Ongoing:   { bg: "#d1ecff", color: "#0c4e86" },
           Resolved:  { bg: "#d1e7dd", color: "#0a3622" },
           Escalated: { bg: "#e2d9f3", color: "#4a235a" },
+          Dismissed: { bg: "#f8d7da", color: "#842029" },
         };
 
         sorted.forEach((rec, i) => {
           const sc = statusColors[rec.status] || { bg: "#eee", color: "#333" };
 
+          // full_name is computed by GetBlotter.php via CONCAT
+          const displayName = rec.full_name || [rec.first_name, rec.last_name].filter(Boolean).join(" ") || "—";
+
           const row = document.createElement("div");
           row.style.cssText = `
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            padding:1.2vh 1vw;
-            border-bottom:1px solid rgba(0,0,0,0.07);
-            background:${i % 2 === 0 ? "#fcfaf7" : "#f3efe8"};
-            border-radius:8px;
-            margin-bottom:0.5vh;
-            gap:0.5vw;
-            transition:background 0.2s;
+            display:flex;align-items:center;justify-content:space-between;
+            padding:1.2vh 1vw;border-bottom:1px solid rgba(0,0,0,0.07);
+            background:${i % 2 === 0 ? "#fcfaf7" : "#f3efe8"};border-radius:8px;
+            margin-bottom:0.5vh;gap:0.5vw;transition:background 0.2s;
           `;
           row.onmouseover = () => row.style.background = "#e8f0d8";
           row.onmouseout  = () => row.style.background = i % 2 === 0 ? "#fcfaf7" : "#f3efe8";
 
           row.innerHTML = `
-            <span style="
-              font-family:'Segoe UI',sans-serif;font-size:1.35vh;
+            <span style="font-family:'Segoe UI',sans-serif;font-size:1.35vh;
               color:#375309;font-weight:700;min-width:30%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
               ${rec.reference_number || "—"}
             </span>
-            <span style="
-              font-family:'Segoe UI',sans-serif;font-size:1.35vh;
+            <span style="font-family:'Segoe UI',sans-serif;font-size:1.35vh;
               color:#273b07;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;">
-              ${rec.full_name || "—"}
+              ${displayName}
             </span>
-            <span style="
-              font-size:1.2vh;padding:3px 8px;border-radius:20px;
+            <span style="font-size:1.2vh;padding:3px 8px;border-radius:20px;
               background:${sc.bg};color:${sc.color};font-weight:600;
               white-space:nowrap;font-family:'Segoe UI',sans-serif;">
               ${rec.status}
@@ -325,18 +291,12 @@ document.addEventListener("DOMContentLoaded", function () {
       .catch(err => console.error("Dashboard blotter fetch error:", err));
   }
 
-  // ── Add column headers to the two latest containers ───────
-  function addListHeader(container, label) {
-    // The label element already exists in HTML (.dtitle / .btitle)
-    // Just inject a column header row below it
+  // ── Add column headers ────────────────────────────────────
+  function addListHeader(container) {
     const header = document.createElement("div");
     header.style.cssText = `
-      display:flex;
-      justify-content:space-between;
-      padding:0.8vh 1vw;
-      margin: 0 5%;
-      border-bottom:2px solid #375309;
-      margin-top:4%;
+      display:flex;justify-content:space-between;padding:0.8vh 1vw;
+      margin:0 5%;border-bottom:2px solid #375309;margin-top:4%;
     `;
     header.innerHTML = `
       <span style="font-family:'Segoe UI',sans-serif;font-size:1.3vh;font-weight:700;color:#375309;min-width:30%;">Ref No.</span>
@@ -346,41 +306,34 @@ document.addEventListener("DOMContentLoaded", function () {
     container.appendChild(header);
   }
 
-  // ── Calendar legend note ───────────────────────────────────
+  // ── Calendar legend note ──────────────────────────────────
   function addCalendarLegend() {
     const wrapper = document.querySelector(".calendar-wrapper");
     if (!wrapper) return;
     const legend = document.createElement("div");
     legend.style.cssText = `
-      display:flex;align-items:center;gap:0.5vw;
-      margin-top:1.5vh;font-family:'Segoe UI',sans-serif;
-      font-size:1.4vh;color:#555;
+      display:flex;align-items:center;gap:0.5vw;margin-top:1.5vh;
+      font-family:'Segoe UI',sans-serif;font-size:1.4vh;color:#555;
     `;
     legend.innerHTML = `
-      <span style="
-        width:10px;height:10px;background:#e74c3c;
-        border-radius:50%;display:inline-block;
-        box-shadow:0 0 4px rgba(231,76,60,0.6);flex-shrink:0;">
+      <span style="width:10px;height:10px;background:#e74c3c;border-radius:50%;
+        display:inline-block;box-shadow:0 0 4px rgba(231,76,60,0.6);flex-shrink:0;">
       </span>
-      Blotter hearing scheduled on this date
+      Active blotter filed on this date
     `;
     wrapper.appendChild(legend);
   }
 
-  // ── Init everything ───────────────────────────────────────
+  // ── Init ──────────────────────────────────────────────────
   addCalendarLegend();
+  addListHeader(document.querySelector(".document-latest-container"));
+  addListHeader(document.querySelector(".blotter-latest-container"));
 
-  // Add column headers to the panels
-  addListHeader(document.querySelector(".document-latest-container"), "Document Requests");
-  addListHeader(document.querySelector(".blotter-latest-container"),  "Blotter Requests");
-
-  // Fetch schedules first, then render calendar with indicators
   fetchBlotterSchedules(function (dates) {
     blotterScheduleDates = dates;
     renderCalendar(currentYear, currentMonth);
   });
 
-  // Fetch the latest records for both panels
   fetchLatestDocuments();
   fetchLatestBlotters();
 

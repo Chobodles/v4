@@ -2,15 +2,17 @@
 // ============================================================
 //  Barangay Tugtug E-System — Submit Document Request
 //  File: php/submit_document.php
+//  Updated to match db-barangay-system schema (no
+//  document_reference_number table; reference stored directly
+//  in document_request.document_refnumber)
 // ============================================================
 header("Content-Type: application/json");
-// ✅ Temporarily show errors in response so we can debug
-ini_set("display_errors", 1);
+ini_set("display_errors", 0);
 ini_set("log_errors", 1);
 error_reporting(E_ALL);
 
 define("DB_HOST",    "localhost");
-define("DB_NAME",    "db_barangay_e-system");
+define("DB_NAME",    "db-barangay-system");
 define("DB_USER",    "root");
 define("DB_PASS",    "");
 define("DB_CHARSET", "utf8mb4");
@@ -26,7 +28,7 @@ try {
     $pdo = new PDO($dsn, DB_USER, DB_PASS, $opt);
 } catch (PDOException $e) {
     error_log("DB error: " . $e->getMessage());
-    echo json_encode(["success" => false, "message" => "Database connection error: " . $e->getMessage()]);
+    echo json_encode(["success" => false, "message" => "Database connection error."]);
     exit();
 }
 
@@ -45,14 +47,18 @@ if (!$data) {
 }
 
 // ── Generate unique reference number ─────────────────────────
+// New schema: document_refnumber is a unique column on document_request;
+// no separate document_reference_number table.
 $year    = date("Y");
 $ref_num = "";
 do {
-    $random  = str_pad(mt_rand(1000, 9999), 4, "0", STR_PAD_LEFT);
+    $random  = str_pad(mt_rand(10000, 99999), 5, "0", STR_PAD_LEFT);
     $ref_num = "DOC-" . $year . "-" . $random;
-    $check   = $pdo->prepare("SELECT COUNT(*) FROM document_reference_number WHERE document_refnumber = :ref");
+    $check   = $pdo->prepare(
+        "SELECT COUNT(*) FROM document_request WHERE document_refnumber = :ref"
+    );
     $check->execute([":ref" => $ref_num]);
-    $exists  = $check->fetchColumn();
+    $exists = $check->fetchColumn();
 } while ($exists > 0);
 
 try {
@@ -62,38 +68,42 @@ try {
          WHERE first_name = :fn AND last_name = :ln LIMIT 1"
     );
     $res_check->execute([
-        ":fn" => $data["first_name"] ?? "",
-        ":ln" => $data["last_name"]  ?? "",
+        ":fn" => trim($data["first_name"] ?? ""),
+        ":ln" => trim($data["last_name"]  ?? ""),
     ]);
     $resident = $res_check->fetch();
 
     if ($resident) {
         $resident_id = $resident["resident_ID"];
     } else {
-        $middle = $data["middle_name"] ?? "";
+        $middle = trim($data["middle_name"] ?? "");
         $mi     = $middle ? strtoupper(substr($middle, 0, 1)) : "";
         $gender = $data["gender"] ?? "";
         $sex    = $gender === "Male" ? "M" : ($gender === "Female" ? "F" : "O");
+        $suffix = trim($data["suffix"] ?? "") ?: null;
 
         $ins = $pdo->prepare(
             "INSERT INTO resident_information
-                (first_name, last_name, middle_initial, sex, birthdate, birthplace)
-             VALUES (:fn, :ln, :mi, :sex, :bd, :bp)"
+                (first_name, last_name, middle_initial, suffix, sex, birthdate, birthplace)
+             VALUES (:fn, :ln, :mi, :suffix, :sex, :bd, :bp)"
         );
         $ins->execute([
-            ":fn"  => $data["first_name"] ?? "",
-            ":ln"  => $data["last_name"]  ?? "",
-            ":mi"  => $mi,
-            ":sex" => $sex,
-            ":bd"  => $data["birthday"]   ?? null,
-            ":bp"  => $data["birthplace"] ?? "",
+            ":fn"     => trim($data["first_name"] ?? ""),
+            ":ln"     => trim($data["last_name"]  ?? ""),
+            ":mi"     => $mi,
+            ":suffix" => $suffix,
+            ":sex"    => $sex,
+            ":bd"     => $data["birthday"]   ?? null,
+            ":bp"     => $data["birthplace"] ?? "",
         ]);
         $resident_id = $pdo->lastInsertId();
     }
 
-    // ── certificate value is already the numeric document_ID ─
+    // ── Validate document_ID ──────────────────────────────────
     $doc_id = intval($data["certificate"] ?? 0);
-    if ($doc_id < 1 || $doc_id > 30) {
+    $docCheck = $pdo->prepare("SELECT COUNT(*) FROM documents WHERE document_ID = :did");
+    $docCheck->execute([":did" => $doc_id]);
+    if ($docCheck->fetchColumn() < 1) {
         echo json_encode(["success" => false, "message" => "Invalid certificate selected. Got: " . ($data["certificate"] ?? "none")]);
         exit();
     }
@@ -111,21 +121,14 @@ try {
         ":ref"     => $ref_num,
         ":rid"     => $resident_id,
         ":did"     => $doc_id,
-        ":contact" => $data["contact"]     ?? "",
-        ":purpose" => $data["purpose"]     ?? "",
-        ":age"     => $data["age"]         ?? 0,
-        ":stay_y"  => $data["stay_years"]  ?? 0,
-        ":stay_m"  => $data["stay_months"] ?? 0,
-        ":qty"     => $data["quantity"]    ?? 1,
+        ":contact" => trim($data["contact"]     ?? ""),
+        ":purpose" => trim($data["purpose"]     ?? ""),
+        ":age"     => intval($data["age"]       ?? 0),
+        ":stay_y"  => intval($data["stay_years"]  ?? 0),
+        ":stay_m"  => intval($data["stay_months"] ?? 0),
+        ":qty"     => intval($data["quantity"]  ?? 1),
     ]);
     $request_id = $pdo->lastInsertId();
-
-    // ── Insert into reference number table (with request_ID) ──
-    $ref_stmt = $pdo->prepare(
-        "INSERT INTO document_reference_number (document_refnumber, request_ID)
-         VALUES (:ref, :req_id)"
-    );
-    $ref_stmt->execute([":ref" => $ref_num, ":req_id" => $request_id]);
 
     echo json_encode([
         "success"          => true,

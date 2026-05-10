@@ -15,7 +15,7 @@ document.getElementById("ref-input").addEventListener("input", function () {
     this.setSelectionRange(pos, pos);
 });
 
-// Check if a ref was passed via URL (from residentchoice tracking inputs)
+// Check if a ref was passed via URL
 window.addEventListener("load", function () {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref");
@@ -38,13 +38,11 @@ function trackRequest() {
     const resultError    = document.getElementById("result-error");
     const resultCard     = document.getElementById("result-card");
 
-    // Show section, reset state
     resultSection.style.display = "block";
     resultLoading.style.display = "block";
     resultError.style.display   = "none";
     resultCard.style.display    = "none";
 
-    // Scroll to result
     resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
 
     fetch("php/track_request.php?ref=" + encodeURIComponent(ref))
@@ -92,18 +90,30 @@ function renderResult(data) {
         "Pending":    { bg: "#fff7ed", border: "#fb923c", color: "#9a3412" },
         "Processing": { bg: "#eff6ff", border: "#60a5fa", color: "#1e40af" },
         "Scheduled":  { bg: "#eff6ff", border: "#60a5fa", color: "#1e40af" },
+        "Ongoing":    { bg: "#e0f2fe", border: "#38bdf8", color: "#0c4a6e" },
         "Ready":      { bg: "#f0fdf4", border: "#4ade80", color: "#166534" },
         "Resolved":   { bg: "#f0fdf4", border: "#4ade80", color: "#166534" },
         "Escalated":  { bg: "#f5f3ff", border: "#8b5cf6", color: "#4a235a" },
+        "Dismissed":  { bg: "#fff1f2", border: "#fda4af", color: "#881337" },
+        "Released":   { bg: "#fdf4ff", border: "#d8b4fe", color: "#6b21a8" },
     };
     const sc = statusColors[d.status] || { bg: "#f9fafb", border: "#d1d5db", color: "#374151" };
     statusBanner.style.cssText = `display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-radius:10px;margin-bottom:12px;background:${sc.bg};border:2px solid ${sc.border};`;
     statusBanner.querySelector(".status-label").style.color = sc.color;
-    statusValue.textContent   = d.status;
-    statusValue.style.color   = sc.color;
+    statusValue.style.color = sc.color;
 
     // Status emoji
-    const statusEmoji = { "Pending":"⏳", "Processing":"🔄", "Scheduled":"📅", "Ready":"✅", "Resolved":"✅", "Escalated":"🔺" };
+    const statusEmoji = {
+        "Pending":    "⏳",
+        "Processing": "🔄",
+        "Scheduled":  "📅",
+        "Ongoing":    "🔄",
+        "Ready":      "✅",
+        "Resolved":   "✅",
+        "Escalated":  "🔺",
+        "Dismissed":  "🚫",
+        "Released":   "📦",
+    };
     statusValue.textContent = (statusEmoji[d.status] || "") + " " + d.status;
 
     // ── Price ─────────────────────────────────────────────────
@@ -117,28 +127,33 @@ function renderResult(data) {
 
     if (type === "blotter") {
         details = [
-            { key: "Name",          val: d.name,                   full: false },
-            { key: "Complainant",   val: d.complainant,            full: false },
-            { key: "Incident Date", val: fmtDate(d.incident_date), full: false },
+            { key: "Name",          val: d.name,                    full: false },
+            { key: "Complainant",   val: d.complainant,             full: false },
+            { key: "Incident Date", val: fmtDate(d.incident_date),  full: false },
+            { key: "Complaint",     val: d.complaint,               full: true  },
         ];
-        // Add schedule rows for whichever slots have data
+        // Schedule fields — track_request.php returns null for all schedule columns
+        // (schedule_date/time columns do not exist in the blotter table).
+        // Only show schedule rows if they actually have data.
         for (let i = 1; i <= 3; i++) {
             const sd = d["schedule_date_" + i];
             const st = d["schedule_time_" + i];
             if (sd) {
-                details.push({ key: "Schedule " + i, val: fmtDate(sd) + (st ? " @ " + fmtTime(st) : ""), full: false });
+                details.push({
+                    key: "Schedule " + i,
+                    val: fmtDate(sd) + (st ? " @ " + fmtTime(st) : ""),
+                    full: false
+                });
             }
         }
-        details.push({ key: "Complaint", val: d.complaint, full: true });
-        details = details;
     } else {
         details = [
-            { key: "Resident Name",    val: d.name,           full: false },
-            { key: "Document Type",    val: d.document_type,  full: false },
-            { key: "Date Requested",   val: fmtDate(d.date_requested), full: false },
-            { key: "Date Released",    val: d.date_released ? fmtDate(d.date_released) : "— Not yet released", full: false },
-            { key: "Quantity",         val: d.quantity,       full: false },
-            { key: "Purpose",          val: d.purpose,        full: true  },
+            { key: "Resident Name",  val: d.name,                              full: false },
+            { key: "Document Type",  val: d.document_type,                     full: false },
+            { key: "Date Requested", val: fmtDate(d.date_requested),           full: false },
+            { key: "Date Released",  val: d.date_released ? fmtDate(d.date_released) : "— Not yet released", full: false },
+            { key: "Quantity",       val: d.quantity,                           full: false },
+            { key: "Purpose",        val: d.purpose,                            full: true  },
         ];
     }
 
@@ -153,35 +168,70 @@ function renderResult(data) {
     const stepsContainer = document.getElementById("progress-steps");
     stepsContainer.innerHTML = "";
 
-    const steps = type === "blotter"
-        ? [
-            { label: "Submitted",  icon: "📝", statuses: ["Pending","Scheduled","Resolved","Escalated"] },
-            { label: "Scheduled",  icon: "📅", statuses: ["Scheduled","Resolved","Escalated"] },
-            { label: "Resolved",   icon: "✅", statuses: ["Resolved","Escalated"] },
-          ]
-        : [
-            { label: "Submitted",   icon: "📝", statuses: ["Pending","Processing","Ready"] },
-            { label: "Processing",  icon: "🔄", statuses: ["Processing","Ready"] },
-            { label: "Ready",       icon: "✅", statuses: ["Ready"] },
-          ];
+    // Blotter statuses from DB enum: Pending, Scheduled, Ongoing, Resolved, Escalated, Dismissed
+    // Document statuses from DB enum: Pending, Processing, Ready, Released, Canceled
+    let steps;
+    let statusOrder;
+
+    if (type === "blotter") {
+        // Handle terminal statuses separately
+        if (d.status === "Escalated") {
+            steps = [
+                { label: "Submitted", icon: "📝" },
+                { label: "Scheduled", icon: "📅" },
+                { label: "Escalated", icon: "🔺" },
+            ];
+            statusOrder = ["Pending", "Scheduled", "Escalated"];
+        } else if (d.status === "Dismissed") {
+            steps = [
+                { label: "Submitted", icon: "📝" },
+                { label: "Scheduled", icon: "📅" },
+                { label: "Dismissed", icon: "🚫" },
+            ];
+            statusOrder = ["Pending", "Scheduled", "Dismissed"];
+        } else {
+            steps = [
+                { label: "Submitted", icon: "📝" },
+                { label: "Scheduled", icon: "📅" },
+                { label: "Ongoing",   icon: "🔄" },
+                { label: "Resolved",  icon: "✅" },
+            ];
+            statusOrder = ["Pending", "Scheduled", "Ongoing", "Resolved"];
+        }
+    } else {
+        if (d.status === "Canceled") {
+            steps = [
+                { label: "Submitted", icon: "📝" },
+                { label: "Canceled",  icon: "🚫" },
+            ];
+            statusOrder = ["Pending", "Canceled"];
+        } else {
+            steps = [
+                { label: "Submitted",   icon: "📝" },
+                { label: "Processing",  icon: "🔄" },
+                { label: "Ready",       icon: "✅" },
+                { label: "Released",    icon: "📦" },
+            ];
+            statusOrder = ["Pending", "Processing", "Ready", "Released"];
+        }
+    }
+
+    // Map the current status to its index in the statusOrder array
+    // "Pending" maps to index 0 (Submitted step)
+    const normalizedStatus = d.status === "Pending" ? statusOrder[0] : d.status;
+    const currentIdx = statusOrder.indexOf(normalizedStatus);
 
     steps.forEach((step, i) => {
-        const isDone   = step.statuses.includes(d.status) && i < steps.length - 1;
-        const isActive = step.statuses.includes(d.status) && !isDone;
-        const isCurrent = d.status === step.label || (i === 0 && d.status === "Pending") || (i === steps.length - 1 && (d.status === "Ready" || d.status === "Resolved"));
-
         const div = document.createElement("div");
-        div.className = "step" + (isCurrent || isDone ? " done" : (step.statuses.includes(d.status) ? " active" : ""));
 
-        // Simpler: mark done if current status is at or past this step
-        const statusOrder = type === "blotter"
-            ? ["Pending", "Scheduled", "Resolved"]
-            : ["Pending", "Processing", "Ready"];
-        const currentIdx = statusOrder.indexOf(d.status);
-        const stepIdx    = i;
+        let stepClass = "step";
+        if (i < currentIdx) {
+            stepClass += " done";
+        } else if (i === currentIdx) {
+            stepClass += " active";
+        }
 
-        div.className = "step" + (stepIdx < currentIdx ? " done" : (stepIdx === currentIdx ? " active" : ""));
-
+        div.className = stepClass;
         div.innerHTML = `
             <div class="step-dot">${step.icon}</div>
             <span class="step-label">${step.label}</span>
