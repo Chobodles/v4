@@ -521,8 +521,11 @@ document.addEventListener("DOMContentLoaded", function () {
       )
       .join("");
 
-    const resolvedAtVal = rec.resolved_at ? rec.resolved_at.split("T")[0] : "";
-    const showResolved = isLocked;
+    const resolvedAtVal = rec.resolved_at
+      ? rec.resolved_at.substring(0, 10)
+      : "";
+    const showResolved =
+      isLocked || ["Resolved", "Escalated", "Dismissed"].includes(rec.status);
 
     // View Image button — enabled only if id_image_path exists
     const hasImage = rec.id_image_path && rec.id_image_path.trim() !== "";
@@ -534,7 +537,8 @@ document.addEventListener("DOMContentLoaded", function () {
       <div class="modal-box" style="width:46vw;min-width:360px;max-height:90vh;overflow-y:auto;">
         <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2vh;">
           <span>Blotter Record — ${rec.reference_number || "—"}</span>
-          <button onclick="printBlotterRecord()" title="Print this blotter record"
+          <button onclick="window.open('php/PrintBlotterSingle.php?blotter_id=${rec.blotter_id}','_blank')" title="Print this blotter record"
+
             style="background:#273b07;color:#f3efe8;border:none;border-radius:7px;
               padding:0.5vh 1.1vw;font-size:1.35vh;font-weight:700;cursor:pointer;
               display:flex;align-items:center;gap:0.4vw;transition:0.2s;flex-shrink:0;"
@@ -560,8 +564,20 @@ document.addEventListener("DOMContentLoaded", function () {
           ${field("Complaint Against", rec.complaint_against)}
           ${field("Complaint Type", rec.complaint_type)}
           ${field("Complaint Details", rec.complaint_details)}
-          ${field("Date Submitted", fmtDate(rec.submitted_at))}
-        </div>
+          ${
+            isLocked
+              ? field(
+                  rec.status === "Escalated"
+                    ? "Date Escalated"
+                    : rec.status === "Dismissed"
+                      ? "Date Dismissed"
+                      : "Date Resolved",
+                  rec.resolved_at
+                    ? fmtDate(rec.resolved_at.substring(0, 10))
+                    : "—",
+                )
+              : ""
+          }        </div>
 
         <!-- SECTION 2: Resolution date -->
         <div id="resolution-section" style="${showResolved ? "" : "display:none;"}">
@@ -660,6 +676,18 @@ document.addEventListener("DOMContentLoaded", function () {
           resSection.style.display = terminalStatuses.includes(this.value)
             ? ""
             : "none";
+        }
+        // update the label dynamically
+        const lbl = document.querySelector(
+          "#resolution-section .sched-field label",
+        );
+        if (lbl) {
+          const map = {
+            Resolved: "Resolved",
+            Escalated: "Escalated",
+            Dismissed: "Dismissed",
+          };
+          lbl.textContent = "Date " + (map[this.value] || "Resolved");
         }
       });
     }
