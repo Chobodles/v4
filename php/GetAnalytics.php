@@ -1,8 +1,12 @@
 <?php
 // ============================================================
-//  Barangay Tugtug E-System — Get Document Records
-//  File: php/GetDocuments.php
-//  Updated DB name to match db-barangay-system schema.
+//  Barangay Tugtug E-System — Analytics Data API
+//  File: php/GetAnalytics.php
+//
+//  Handles three query types (via ?type=):
+//    years            – distinct years from both tables
+//    documents        – document requests grouped by type for a given month+year
+//    blotter_monthly  – blotter cases grouped by month for a given year
 // ============================================================
 
 header("Content-Type: application/json");
@@ -17,7 +21,8 @@ define("DB_USER", "root");
 define("DB_PASS", "");
 define("DB_CHARSET", "utf8mb4");
 
-$dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+$dsn =
+    "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -36,177 +41,138 @@ try {
     exit();
 }
 
-if ($_SERVER["REQUEST_METHOD"] === "GET") {
-    $search    = isset($_GET["search"])    ? trim($_GET["search"])    : "";
-    $filter    = isset($_GET["filter"])    ? trim($_GET["filter"])    : "";
-    $date_from = isset($_GET["date_from"]) ? trim($_GET["date_from"]) : "";
-    $date_to   = isset($_GET["date_to"])   ? trim($_GET["date_to"])   : "";
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    http_response_code(405);
+    echo json_encode(["success" => false, "message" => "Method not allowed."]);
+    exit();
+}
 
-    $sql = "SELECT
-                dr.request_ID,
-                dr.document_refnumber,
-                dr.resident_ID,
-                ri.first_name,
-                ri.last_name,
-                ri.middle_initial,
-                ri.sex,
-                ri.birthdate,
-                dr.document_ID,
-                d.document_type,
-                d.price,
-                dr.contact,
-                dr.document_purpose,
-                dr.date,
-                dr.status,
-                dr.date_released,
-                dr.quantity
-            FROM document_request dr
-            LEFT JOIN resident_information ri ON dr.resident_ID = ri.resident_ID
-            LEFT JOIN documents d ON dr.document_ID = d.document_ID
-            WHERE 1=1";
+$type = isset($_GET["type"]) ? trim($_GET["type"]) : "";
 
-    $params = [];
+// ────────────────────────────────────────────────────────────
+//  type=years  →  distinct years present in both tables
+// ────────────────────────────────────────────────────────────
+if ($type === "years") {
+    try {
+        $stmt = $pdo->query(
+            "SELECT DISTINCT YEAR(date) AS yr FROM document_request WHERE date IS NOT NULL
+             UNION
+             SELECT DISTINCT YEAR(petsa) AS yr FROM blotter WHERE petsa IS NOT NULL
+             ORDER BY yr DESC",
+        );
+        $rows = $stmt->fetchAll();
+        $years = array_map(function ($r) {
+            return (int) $r["yr"];
+        }, $rows);
 
-    if (!empty($search)) {
-        $sql .= " AND (ri.first_name LIKE :search1
-                    OR ri.last_name  LIKE :search2
-                    OR dr.document_purpose LIKE :search3
-                    OR dr.status LIKE :search4
-                    OR d.document_type LIKE :search5
-                    OR dr.document_refnumber LIKE :search6)";
-        $likeSearch = "%" . $search . "%";
-        $params[":search1"] = $likeSearch;
-        $params[":search2"] = $likeSearch;
-        $params[":search3"] = $likeSearch;
-        $params[":search4"] = $likeSearch;
-        $params[":search5"] = $likeSearch;
-        $params[":search6"] = $likeSearch;
+        if (empty($years)) {
+            $years = [(int) date("Y")];
+        }
+
+        echo json_encode(["success" => true, "years" => $years]);
+    } catch (PDOException $e) {
+        error_log("Analytics years error: " . $e->getMessage());
+        echo json_encode([
+            "success" => false,
+            "message" => "Failed to fetch years.",
+        ]);
     }
+    exit();
+}
 
-    if (!empty($filter) && $filter !== "Total" && $filter !== "date") {
-        $sql .= " AND dr.status = :filter";
-        $params[":filter"] = $filter;
-    }
+// ────────────────────────────────────────────────────────────
+//  type=documents  →  requests per document_type for month+year
+// ────────────────────────────────────────────────────────────
+if ($type === "documents") {
+    $month = isset($_GET["month"]) ? (int) $_GET["month"] : (int) date("m");
+    $year = isset($_GET["year"]) ? (int) $_GET["year"] : (int) date("Y");
 
-    if (!empty($date_from)) {
-        $sql .= " AND dr.date >= :date_from";
-        $params[":date_from"] = $date_from;
+    if ($month < 1 || $month > 12) {
+        echo json_encode(["success" => false, "message" => "Invalid month."]);
+        exit();
     }
-    if (!empty($date_to)) {
-        $sql .= " AND dr.date <= :date_to";
-        $params[":date_to"] = $date_to;
-    }
-
-    $sql .= " ORDER BY dr.request_ID ASC";
 
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $records = $stmt->fetchAll();
-
-        // Fix zero-dates from MySQL
-        foreach ($records as &$row) {
-            if (
-                isset($row["date_released"]) &&
-                ($row["date_released"] === "0000-00-00" ||
-                    $row["date_released"] === "0000-00-00 00:00:00")
-            ) {
-                $row["date_released"] = null;
-            }
-        }
-        unset($row);
-
-        $countStmt = $pdo->query(
-            "SELECT status, COUNT(*) as count FROM document_request GROUP BY status"
+        $stmt = $pdo->prepare(
+            "SELECT d.document_type, COUNT(*) AS total
+             FROM document_request dr
+             LEFT JOIN documents d ON dr.document_ID = d.document_ID
+             WHERE MONTH(dr.date) = :month
+               AND YEAR(dr.date)  = :year
+             GROUP BY d.document_type
+             ORDER BY total DESC",
         );
-        $counts = [
-            "Total"      => 0,
-            "Pending"    => 0,
-            "Processing" => 0,
-            "Ready"      => 0,
-            "Released"   => 0,
-            "Canceled"   => 0,
-        ];
-        while ($row = $countStmt->fetch()) {
-            $counts[$row["status"]] = (int) $row["count"];
-            $counts["Total"]       += (int) $row["count"];
-        }
+        $stmt->execute([":month" => $month, ":year" => $year]);
+        $rows = $stmt->fetchAll();
 
         echo json_encode([
             "success" => true,
-            "records" => $records,
-            "counts"  => $counts,
+            "data" => $rows,
         ]);
     } catch (PDOException $e) {
-        error_log("Query error: " . $e->getMessage());
+        error_log("Analytics documents error: " . $e->getMessage());
         echo json_encode([
             "success" => false,
-            "message" => "Failed to fetch records.",
+            "message" => "Failed to fetch document analytics.",
         ]);
     }
     exit();
 }
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $body = file_get_contents("php://input");
-    $data = json_decode($body, true);
-
-    if (!isset($data["request_ID"], $data["status"])) {
-        http_response_code(400);
-        echo json_encode(["success" => false, "message" => "Missing fields."]);
-        exit();
-    }
-
-    $allowedStatuses = ["Pending", "Processing", "Ready", "Released", "Canceled"];
-    if (!in_array($data["status"], $allowedStatuses)) {
-        echo json_encode(["success" => false, "message" => "Invalid status."]);
-        exit();
-    }
+// ────────────────────────────────────────────────────────────
+//  type=blotter_monthly  →  cases per month for a given year,
+//                           broken down by status
+// ────────────────────────────────────────────────────────────
+if ($type === "blotter_monthly") {
+    $year = isset($_GET["year"]) ? (int) $_GET["year"] : (int) date("Y");
 
     try {
-        if (!empty($data["clear_date_released"])) {
-            $date_released = null;
-        } elseif ($data["status"] === "Released") {
-            if (!empty($data["date_released"])) {
-                $d = DateTime::createFromFormat("Y-m-d", $data["date_released"]);
-                $date_released = ($d && $d->format("Y-m-d") === $data["date_released"])
-                    ? $data["date_released"]
-                    : date("Y-m-d");
-            } else {
-                $date_released = date("Y-m-d");
-            }
-        } else {
-            $date_released = null;
-        }
-
         $stmt = $pdo->prepare(
-            "UPDATE document_request
-             SET status = :status, date_released = :date_released
-             WHERE request_ID = :id"
+            "SELECT
+                MONTH(petsa)                                           AS month_num,
+                COUNT(*)                                               AS total,
+                SUM(CASE WHEN status = 'Resolved'  THEN 1 ELSE 0 END) AS resolved,
+                SUM(CASE WHEN status = 'Escalated' THEN 1 ELSE 0 END) AS escalated,
+                SUM(CASE WHEN status = 'Dismissed' THEN 1 ELSE 0 END) AS dismissed,
+                SUM(CASE WHEN status = 'Pending'   THEN 1 ELSE 0 END) AS pending
+             FROM blotter
+             WHERE YEAR(petsa) = :year
+             GROUP BY MONTH(petsa)
+             ORDER BY MONTH(petsa) ASC",
         );
+        $stmt->execute([":year" => $year]);
+        $rows = $stmt->fetchAll();
 
-        $stmt->execute([
-            ":status"        => $data["status"],
-            ":date_released" => $date_released,
-            ":id"            => $data["request_ID"],
-        ]);
+        $data = array_map(function ($r) {
+            return [
+                "month_num" => (int) $r["month_num"],
+                "total" => (int) $r["total"],
+                "resolved" => (int) $r["resolved"],
+                "escalated" => (int) $r["escalated"],
+                "dismissed" => (int) $r["dismissed"],
+                "pending" => (int) $r["pending"],
+            ];
+        }, $rows);
 
         echo json_encode([
-            "success"       => true,
-            "message"       => "Status updated successfully.",
-            "date_released" => $date_released,
+            "success" => true,
+            "data" => $data,
         ]);
     } catch (PDOException $e) {
-        error_log("Update error: " . $e->getMessage());
+        error_log("Analytics blotter error: " . $e->getMessage());
         echo json_encode([
             "success" => false,
-            "message" => "Failed to update status.",
+            "message" => "Failed to fetch blotter analytics.",
         ]);
     }
     exit();
 }
 
-http_response_code(405);
-echo json_encode(["success" => false, "message" => "Method not allowed."]);
+// Unknown type
+http_response_code(400);
+echo json_encode([
+    "success" => false,
+    "message" => "Unknown analytics type: " . htmlspecialchars($type),
+]);
 exit();
 ?>
