@@ -73,7 +73,28 @@ document.addEventListener("DOMContentLoaded", function () {
     "input",
     debounce(() => fetchRecords(), 400),
   );
-  btnPrint.addEventListener("click", () => window.print());
+
+  btnPrint.addEventListener("click", () => {
+    const search = searchInput.value.trim();
+    const filter = filterSelect.value;
+    const dateFrom = document.getElementById("date-from")
+      ? document.getElementById("date-from").value
+      : "";
+    const dateTo = document.getElementById("date-to")
+      ? document.getElementById("date-to").value
+      : "";
+
+    let url = "php/PrintDocuments.php?";
+    if (search) url += "search=" + encodeURIComponent(search) + "&";
+    if (filter && filter !== "date")
+      url += "filter=" + encodeURIComponent(filter) + "&";
+    if (filter === "date" && dateFrom)
+      url += "date_from=" + encodeURIComponent(dateFrom) + "&";
+    if (filter === "date" && dateTo)
+      url += "date_to=" + encodeURIComponent(dateTo) + "&";
+
+    window.open(url, "_blank");
+  });
 
   // Delegated click for dynamically rendered Update buttons
   recordsContainer.addEventListener("click", function (e) {

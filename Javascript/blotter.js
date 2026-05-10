@@ -10,11 +10,11 @@
 
 document.addEventListener("DOMContentLoaded", function () {
   const recordsContainer = document.querySelector(".document-records");
-  const searchInput      = document.querySelector(".search-input");
-  const filterSelect     = document.querySelector(".filter-select");
-  const btnDisplay       = document.querySelector(".btn-display");
-  const btnPrint         = document.querySelector(".btn-print");
-  const btnHearings      = document.querySelector(".btn-hearings");
+  const searchInput = document.querySelector(".search-input");
+  const filterSelect = document.querySelector(".filter-select");
+  const btnDisplay = document.querySelector(".btn-display");
+  const btnPrint = document.querySelector(".btn-print");
+  const btnHearings = document.querySelector(".btn-hearings");
 
   // ── Inject date range inputs into filter group ────────────
   const filterGroup = document.querySelector(".filter-group");
@@ -57,10 +57,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ── Status colors (all statuses in DB enum) ───────────────
   const statusColors = {
-    Pending:   { bg: "#fff3cd", color: "#856404", border: "#ffc107" },
+    Pending: { bg: "#fff3cd", color: "#856404", border: "#ffc107" },
     Scheduled: { bg: "#cfe2ff", color: "#084298", border: "#0d6efd" },
-    Ongoing:   { bg: "#d1ecff", color: "#0c4e86", border: "#3b82f6" },
-    Resolved:  { bg: "#d1e7dd", color: "#0a3622", border: "#198754" },
+    Ongoing: { bg: "#d1ecff", color: "#0c4e86", border: "#3b82f6" },
+    Resolved: { bg: "#d1e7dd", color: "#0a3622", border: "#198754" },
     Escalated: { bg: "#e2d9f3", color: "#4a235a", border: "#8b5cf6" },
     Dismissed: { bg: "#f8d7da", color: "#842029", border: "#f1aeb5" },
   };
@@ -78,27 +78,32 @@ document.addEventListener("DOMContentLoaded", function () {
     fetchRecords();
   });
 
-  searchInput.addEventListener("input", debounce(() => fetchRecords(), 400));
+  searchInput.addEventListener(
+    "input",
+    debounce(() => fetchRecords(), 400),
+  );
 
   // Print All — fetches all records and prints a summary
   btnPrint.addEventListener("click", () => {
-    const origText = btnPrint.textContent;
-    btnPrint.textContent = "Loading…";
-    btnPrint.disabled = true;
+    const search = searchInput.value.trim();
+    const filter = filterSelect.value;
+    const dateFrom = document.getElementById("date-from")
+      ? document.getElementById("date-from").value
+      : "";
+    const dateTo = document.getElementById("date-to")
+      ? document.getElementById("date-to").value
+      : "";
 
-    fetch("php/GetBlotter.php")
-      .then(res => res.json())
-      .then(data => {
-        btnPrint.textContent = origText;
-        btnPrint.disabled = false;
-        if (!data.success || !data.records) { showToast("❌ Could not load records for printing."); return; }
-        printAllRecords(data.records, data.counts);
-      })
-      .catch(() => {
-        btnPrint.textContent = origText;
-        btnPrint.disabled = false;
-        showToast("❌ Server error while loading records.");
-      });
+    let url = "php/PrintBlotter.php?";
+    if (search) url += "search=" + encodeURIComponent(search) + "&";
+    if (filter && filter !== "date")
+      url += "filter=" + encodeURIComponent(filter) + "&";
+    if (filter === "date" && dateFrom)
+      url += "date_from=" + encodeURIComponent(dateFrom) + "&";
+    if (filter === "date" && dateTo)
+      url += "date_to=" + encodeURIComponent(dateTo) + "&";
+
+    window.open(url, "_blank");
   });
 
   // Hearings button — filter to Scheduled only
@@ -115,22 +120,31 @@ document.addEventListener("DOMContentLoaded", function () {
   recordsContainer.addEventListener("click", function (e) {
     const btn = e.target.closest(".btn-update-record");
     if (!btn) return;
-    const rec = JSON.parse(btn.getAttribute("data-record").replace(/&apos;/g, "'"));
+    const rec = JSON.parse(
+      btn.getAttribute("data-record").replace(/&apos;/g, "'"),
+    );
     openUpdateModal(rec);
   });
 
   // ── Fetch ─────────────────────────────────────────────────
   function fetchRecords() {
-    const search   = searchInput.value.trim();
-    const filter   = filterSelect.value;
-    const dateFrom = document.getElementById("date-from") ? document.getElementById("date-from").value : "";
-    const dateTo   = document.getElementById("date-to")   ? document.getElementById("date-to").value   : "";
+    const search = searchInput.value.trim();
+    const filter = filterSelect.value;
+    const dateFrom = document.getElementById("date-from")
+      ? document.getElementById("date-from").value
+      : "";
+    const dateTo = document.getElementById("date-to")
+      ? document.getElementById("date-to").value
+      : "";
 
     let url = "php/GetBlotter.php?";
-    if (search)                        url += "search="    + encodeURIComponent(search)   + "&";
-    if (filter && filter !== "date")   url += "filter="    + encodeURIComponent(filter)   + "&";
-    if (filter === "date" && dateFrom) url += "date_from=" + encodeURIComponent(dateFrom) + "&";
-    if (filter === "date" && dateTo)   url += "date_to="   + encodeURIComponent(dateTo)   + "&";
+    if (search) url += "search=" + encodeURIComponent(search) + "&";
+    if (filter && filter !== "date")
+      url += "filter=" + encodeURIComponent(filter) + "&";
+    if (filter === "date" && dateFrom)
+      url += "date_from=" + encodeURIComponent(dateFrom) + "&";
+    if (filter === "date" && dateTo)
+      url += "date_to=" + encodeURIComponent(dateTo) + "&";
 
     recordsContainer.innerHTML = `
       <div style="display:flex;justify-content:center;align-items:center;
@@ -142,21 +156,27 @@ document.addEventListener("DOMContentLoaded", function () {
       </div>`;
 
     fetch(url)
-      .then(res => res.json())
-      .then(data => {
-        if (!data.success) { showError(data.message || "Failed to load records."); return; }
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.success) {
+          showError(data.message || "Failed to load records.");
+          return;
+        }
         updateCounts(data.counts);
         renderTable(data.records);
       })
-      .catch(err => { console.error(err); showError("Server error. Please try again."); });
+      .catch((err) => {
+        console.error(err);
+        showError("Server error. Please try again.");
+      });
   }
 
   // ── Summary cards ─────────────────────────────────────────
   function updateCounts(counts) {
-    setCount(document.querySelector(".total"),      counts.Total     || 0);
+    setCount(document.querySelector(".total"), counts.Total || 0);
     setCount(document.querySelector(".processing"), counts.Scheduled || 0);
-    setCount(document.querySelector(".pending"),    counts.Pending   || 0);
-    setCount(document.querySelector(".ready"),      counts.Resolved  || 0);
+    setCount(document.querySelector(".pending"), counts.Pending || 0);
+    setCount(document.querySelector(".ready"), counts.Resolved || 0);
   }
   function setCount(el, count) {
     if (!el) return;
@@ -208,17 +228,25 @@ document.addEventListener("DOMContentLoaded", function () {
 
     records.forEach((rec, i) => {
       const tr = document.createElement("tr");
-      const isLocked = rec.status === "Resolved" || rec.status === "Escalated" || rec.status === "Dismissed";
+      const isLocked =
+        rec.status === "Resolved" ||
+        rec.status === "Escalated" ||
+        rec.status === "Dismissed";
       tr.style.cssText = `background-color:${i % 2 === 0 ? "#fafaf7" : "#f3efe8"};transition:background-color 0.2s;
         ${isLocked ? "opacity:0.85;" : ""}`;
       tr.onmouseover = () => (tr.style.backgroundColor = "#e8f0d8");
-      tr.onmouseout  = () => (tr.style.backgroundColor = i % 2 === 0 ? "#fafaf7" : "#f3efe8");
+      tr.onmouseout = () =>
+        (tr.style.backgroundColor = i % 2 === 0 ? "#fafaf7" : "#f3efe8");
 
-      const sc = statusColors[rec.status] || { bg: "#eee", color: "#333", border: "#aaa" };
+      const sc = statusColors[rec.status] || {
+        bg: "#eee",
+        color: "#333",
+        border: "#aaa",
+      };
 
       const btnLabel = isLocked ? `🔒 View / Unlock` : `✏ Update`;
-      const btnBg    = isLocked ? "#6c3483" : "#375309";
-      const btnHov   = isLocked ? "#8b5cf6" : "#7d9e3b";
+      const btnBg = isLocked ? "#6c3483" : "#375309";
+      const btnHov = isLocked ? "#8b5cf6" : "#7d9e3b";
 
       tr.innerHTML = `
         <td style="${td()}text-align:center;">${rec.reference_number || "—"}</td>
@@ -252,18 +280,26 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // ── Helpers ───────────────────────────────────────────────
-  function th() { return `padding:1.2vh 1vw;text-align:left;font-size:1.5vh;font-weight:600;white-space:nowrap;`; }
-  function td() { return `padding:1vh 1vw;border-bottom:1px solid #ddd;`; }
+  function th() {
+    return `padding:1.2vh 1vw;text-align:left;font-size:1.5vh;font-weight:600;white-space:nowrap;`;
+  }
+  function td() {
+    return `padding:1vh 1vw;border-bottom:1px solid #ddd;`;
+  }
   function fmtDate(d) {
     if (!d) return "—";
-    return new Date(d).toLocaleDateString("en-PH", { year:"numeric", month:"short", day:"numeric" });
+    return new Date(d).toLocaleDateString("en-PH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   }
   function fmtTime(t) {
     if (!t) return "—";
     const [h, m] = String(t).split(":");
     const hour = parseInt(h);
     const ampm = hour >= 12 ? "PM" : "AM";
-    const h12  = hour % 12 || 12;
+    const h12 = hour % 12 || 12;
     return `${h12}:${m} ${ampm}`;
   }
   function showError(msg) {
@@ -273,7 +309,10 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   function debounce(fn, delay) {
     let t;
-    return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), delay); };
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), delay);
+    };
   }
 
   // ── CSS ───────────────────────────────────────────────────
@@ -433,8 +472,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const existing = document.getElementById("update-modal");
     if (existing) existing.remove();
 
-    const isLocked = rec.status === "Resolved" || rec.status === "Escalated" || rec.status === "Dismissed";
-    const sc = statusColors[rec.status] || { bg:"#eee", color:"#333", border:"#aaa" };
+    const isLocked =
+      rec.status === "Resolved" ||
+      rec.status === "Escalated" ||
+      rec.status === "Dismissed";
+    const sc = statusColors[rec.status] || {
+      bg: "#eee",
+      color: "#333",
+      border: "#aaa",
+    };
 
     const statusBadge = `<span style="margin-left:1vw;padding:0.3vh 0.8vw;border-radius:20px;
       font-size:1.4vh;background:${sc.bg};color:${sc.color};border:1px solid ${sc.border};">
@@ -448,7 +494,8 @@ document.addEventListener("DOMContentLoaded", function () {
         </div>`;
     }
 
-    const lockBanner = isLocked ? `
+    const lockBanner = isLocked
+      ? `
       <div class="locked-banner">
         <span class="locked-banner-icon">🔒</span>
         <div class="locked-banner-text">
@@ -456,15 +503,26 @@ document.addEventListener("DOMContentLoaded", function () {
           This blotter has been marked as <strong>${rec.status}</strong>.
           To make changes, click "Unlock to Edit" and select a new status.
         </div>
-      </div>` : "";
+      </div>`
+      : "";
 
-    const statuses = ["Pending", "Scheduled", "Ongoing", "Resolved", "Escalated", "Dismissed"];
-    const statusOptions = statuses.map(s =>
-      `<option value="${s}" ${rec.status === s ? "selected" : ""}>${s}</option>`
-    ).join("");
+    const statuses = [
+      "Pending",
+      "Scheduled",
+      "Ongoing",
+      "Resolved",
+      "Escalated",
+      "Dismissed",
+    ];
+    const statusOptions = statuses
+      .map(
+        (s) =>
+          `<option value="${s}" ${rec.status === s ? "selected" : ""}>${s}</option>`,
+      )
+      .join("");
 
     const resolvedAtVal = rec.resolved_at ? rec.resolved_at.split("T")[0] : "";
-    const showResolved  = isLocked;
+    const showResolved = isLocked;
 
     // View Image button — enabled only if id_image_path exists
     const hasImage = rec.id_image_path && rec.id_image_path.trim() !== "";
@@ -510,12 +568,22 @@ document.addEventListener("DOMContentLoaded", function () {
           <div style="background:#fff8e6;border-radius:10px;padding:1.5vh 1.5vw;margin-bottom:1.5vh;
             border:1.5px solid #ffc107;">
             <div class="modal-section-title" style="color:#856404;">
-              ${rec.status === "Escalated" ? "🔺 Escalation Details" :
-                rec.status === "Dismissed" ? "🚫 Dismissal Details" : "✅ Resolution Details"}
+              ${
+                rec.status === "Escalated"
+                  ? "🔺 Escalation Details"
+                  : rec.status === "Dismissed"
+                    ? "🚫 Dismissal Details"
+                    : "✅ Resolution Details"
+              }
             </div>
             <div class="sched-field">
-              <label>Date ${rec.status === "Escalated" ? "Escalated" :
-                             rec.status === "Dismissed" ? "Dismissed" : "Resolved"}</label>
+              <label>Date ${
+                rec.status === "Escalated"
+                  ? "Escalated"
+                  : rec.status === "Dismissed"
+                    ? "Dismissed"
+                    : "Resolved"
+              }</label>
               <input type="date" id="resolved-at-input" value="${resolvedAtVal}"
                 ${isLocked ? "readonly style='background:#f9f9f9;cursor:default;'" : ""}>
             </div>
@@ -528,12 +596,16 @@ document.addEventListener("DOMContentLoaded", function () {
           <div class="modal-section-title" style="color:${isLocked ? "#6c3483" : "#856404"};
             display:flex;align-items:center;justify-content:space-between;">
             <span>${isLocked ? "🔒 RECORD STATUS (LOCKED)" : "UPDATE STATUS"}</span>
-            ${isLocked ? `
+            ${
+              isLocked
+                ? `
             <button id="btn-unlock-record" style="background:#6c3483;color:white;border:none;
               border-radius:6px;padding:0.5vh 1vw;font-size:1.3vh;font-weight:700;cursor:pointer;transition:0.2s;"
               onmouseover="this.style.background='#8b5cf6'"
               onmouseout="this.style.background='#6c3483'"
-              onclick="unlockRecord()">🔓 Unlock to Edit</button>` : ""}
+              onclick="unlockRecord()">🔓 Unlock to Edit</button>`
+                : ""
+            }
           </div>
           <label class="modal-label">Current Status: ${statusBadge}</label>
           <label class="modal-label" style="margin-top:1.5vh;">New Status</label>
@@ -541,10 +613,14 @@ document.addEventListener("DOMContentLoaded", function () {
             style="${isLocked ? "opacity:0.5;cursor:not-allowed;pointer-events:none;" : ""}">
             ${statusOptions}
           </select>
-          ${isLocked ? `<div id="locked-hint" style="font-size:1.35vh;color:#6c3483;background:#ede7f6;
+          ${
+            isLocked
+              ? `<div id="locked-hint" style="font-size:1.35vh;color:#6c3483;background:#ede7f6;
             padding:0.8vh 1vw;border-radius:7px;margin-top:-1vh;">
             🔒 Click <strong>"Unlock to Edit"</strong> above to change the status.
-          </div>` : ""}
+          </div>`
+              : ""
+          }
         </div>
 
         <!-- ACTION BUTTONS -->
@@ -569,7 +645,9 @@ document.addEventListener("DOMContentLoaded", function () {
         </div>
       </div>`;
 
-    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
     document.body.appendChild(overlay);
 
     // Show/hide resolution section when status dropdown changes
@@ -579,28 +657,36 @@ document.addEventListener("DOMContentLoaded", function () {
         const resSection = document.getElementById("resolution-section");
         const terminalStatuses = ["Resolved", "Escalated", "Dismissed"];
         if (resSection) {
-          resSection.style.display = terminalStatuses.includes(this.value) ? "" : "none";
+          resSection.style.display = terminalStatuses.includes(this.value)
+            ? ""
+            : "none";
         }
       });
     }
 
     // ── Unlock handler ─────────────────────────────────────
     window.unlockRecord = function () {
-      const select    = document.getElementById("modal-status-select");
-      const hint      = document.getElementById("locked-hint");
+      const select = document.getElementById("modal-status-select");
+      const hint = document.getElementById("locked-hint");
       const unlockBtn = document.getElementById("btn-unlock-record");
 
-      if (unlockBtn) { unlockBtn.disabled = true; unlockBtn.textContent = "Unlocking…"; }
+      if (unlockBtn) {
+        unlockBtn.disabled = true;
+        unlockBtn.textContent = "Unlocking…";
+      }
 
       fetch("php/GetBlotter.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blotter_id: rec.blotter_id, clear_locked: true }),
+        body: JSON.stringify({
+          blotter_id: rec.blotter_id,
+          clear_locked: true,
+        }),
       })
-        .then(r => r.json())
+        .then((r) => r.json())
         .then(() => {
-          select.style.opacity       = "1";
-          select.style.cursor        = "pointer";
+          select.style.opacity = "1";
+          select.style.cursor = "pointer";
           select.style.pointerEvents = "auto";
           select.value = "Scheduled";
           if (hint) hint.style.display = "none";
@@ -609,7 +695,10 @@ document.addEventListener("DOMContentLoaded", function () {
           if (resSection) resSection.style.display = "none";
         })
         .catch(() => {
-          if (unlockBtn) { unlockBtn.disabled = false; unlockBtn.textContent = "🔓 Unlock to Edit"; }
+          if (unlockBtn) {
+            unlockBtn.disabled = false;
+            unlockBtn.textContent = "🔓 Unlock to Edit";
+          }
           showToast("❌ Failed to unlock. Please try again.");
         });
     };
@@ -625,7 +714,9 @@ document.addEventListener("DOMContentLoaded", function () {
     lightbox.id = "img-lightbox";
 
     // Build the image URL — handle both relative and absolute paths
-    const imgSrc = imagePath.startsWith("http") ? imagePath : ("php/" + imagePath).replace("php/php/", "php/");
+    const imgSrc = imagePath.startsWith("http")
+      ? imagePath
+      : ("php/" + imagePath).replace("php/php/", "php/");
 
     lightbox.innerHTML = `
       <div style="text-align:center;">
@@ -645,7 +736,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ✕ Close
       </button>`;
 
-    lightbox.addEventListener("click", e => {
+    lightbox.addEventListener("click", (e) => {
       if (e.target === lightbox) lightbox.remove();
     });
     document.body.appendChild(lightbox);
@@ -685,19 +776,24 @@ document.addEventListener("DOMContentLoaded", function () {
   };
 
   window.executeDeleteBlotter = function (blotterId) {
-    const deleteModal  = document.getElementById("delete-modal");
-    const updateModal  = document.getElementById("update-modal");
-    const yesBtn = deleteModal ? deleteModal.querySelector(".delete-btn-yes") : null;
+    const deleteModal = document.getElementById("delete-modal");
+    const updateModal = document.getElementById("update-modal");
+    const yesBtn = deleteModal
+      ? deleteModal.querySelector(".delete-btn-yes")
+      : null;
 
-    if (yesBtn) { yesBtn.textContent = "Deleting…"; yesBtn.disabled = true; }
+    if (yesBtn) {
+      yesBtn.textContent = "Deleting…";
+      yesBtn.disabled = true;
+    }
 
     fetch("php/DeleteBlotter.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ blotter_id: blotterId }),
     })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (deleteModal) deleteModal.remove();
         if (updateModal) updateModal.remove();
         if (data.success) {
@@ -715,7 +811,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ── Save main status ──────────────────────────────────────
   window.saveBlotterStatus = function (blotterId) {
-    const selectEl  = document.getElementById("modal-status-select");
+    const selectEl = document.getElementById("modal-status-select");
     const newStatus = selectEl.value;
 
     const terminalStatuses = ["Resolved", "Escalated", "Dismissed"];
@@ -733,8 +829,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const todayLocal = new Date();
     const yyyy = todayLocal.getFullYear();
-    const mm   = String(todayLocal.getMonth() + 1).padStart(2, "0");
-    const dd   = String(todayLocal.getDate()).padStart(2, "0");
+    const mm = String(todayLocal.getMonth() + 1).padStart(2, "0");
+    const dd = String(todayLocal.getDate()).padStart(2, "0");
     const todayStr = `${yyyy}-${mm}-${dd}`;
 
     const emojiMap = { Resolved: "✅", Escalated: "🔺", Dismissed: "🚫" };
@@ -778,7 +874,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   window.confirmLockBlotter = function (blotterId, newStatus) {
-    const dateInput  = document.getElementById("resolved-date-input");
+    const dateInput = document.getElementById("resolved-date-input");
     const chosenDate = dateInput ? dateInput.value : "";
 
     if (!chosenDate) {
@@ -792,12 +888,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function doSaveStatus(blotterId, newStatus, resolvedAt) {
     const saveBtn = document.getElementById("modal-save-btn");
-    if (saveBtn) { saveBtn.textContent = "Saving…"; saveBtn.disabled = true; }
+    if (saveBtn) {
+      saveBtn.textContent = "Saving…";
+      saveBtn.disabled = true;
+    }
 
     const payload = {
       blotter_id: blotterId,
-      action:     "update_status",
-      status:     newStatus,
+      action: "update_status",
+      status: newStatus,
     };
     if (resolvedAt) payload.resolved_at = resolvedAt;
 
@@ -806,19 +905,19 @@ document.addEventListener("DOMContentLoaded", function () {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         const modal = document.getElementById("update-modal");
         if (modal) modal.remove();
         const terminalMsg = {
-          Resolved:  "✅ Blotter marked as Resolved and locked.",
+          Resolved: "✅ Blotter marked as Resolved and locked.",
           Escalated: "🔺 Blotter marked as Escalated and locked.",
           Dismissed: "🚫 Blotter marked as Dismissed and locked.",
         };
         showToast(
           data.success
-            ? (terminalMsg[newStatus] || "✅ Status updated to " + newStatus)
-            : "❌ " + (data.message || "Update failed.")
+            ? terminalMsg[newStatus] || "✅ Status updated to " + newStatus
+            : "❌ " + (data.message || "Update failed."),
         );
         if (data.success) fetchRecords();
       })
@@ -843,10 +942,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const blotterId = parseInt(idMatch[0]);
 
     fetch("php/GetBlotter.php")
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         if (!data.success) return;
-        const rec = (data.records || []).find(r => r.blotter_id === blotterId);
+        const rec = (data.records || []).find(
+          (r) => r.blotter_id === blotterId,
+        );
         if (!rec) return;
         printSingleRecord(rec);
       })
@@ -854,10 +955,16 @@ document.addEventListener("DOMContentLoaded", function () {
   };
 
   function printSingleRecord(rec) {
-    function safe(v) { return v ? String(v).replace(/</g,"&lt;").replace(/>/g,"&gt;") : "—"; }
+    function safe(v) {
+      return v ? String(v).replace(/</g, "&lt;").replace(/>/g, "&gt;") : "—";
+    }
     function fmtD(d) {
       if (!d) return "—";
-      return new Date(d).toLocaleDateString("en-PH", { year:"numeric", month:"long", day:"numeric" });
+      return new Date(d).toLocaleDateString("en-PH", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
     }
     function fmtT(t) {
       if (!t) return "—";
@@ -867,20 +974,34 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const statusStyleMap = {
-      Pending:   "background:#fff3cd;color:#856404;border:1px solid #ffc107;",
+      Pending: "background:#fff3cd;color:#856404;border:1px solid #ffc107;",
       Scheduled: "background:#cfe2ff;color:#084298;border:1px solid #0d6efd;",
-      Ongoing:   "background:#d1ecff;color:#0c4e86;border:1px solid #3b82f6;",
-      Resolved:  "background:#d1e7dd;color:#0a3622;border:1px solid #198754;",
+      Ongoing: "background:#d1ecff;color:#0c4e86;border:1px solid #3b82f6;",
+      Resolved: "background:#d1e7dd;color:#0a3622;border:1px solid #198754;",
       Escalated: "background:#e2d9f3;color:#4a235a;border:1px solid #8b5cf6;",
       Dismissed: "background:#f8d7da;color:#842029;border:1px solid #f1aeb5;",
     };
-    const statusStyle = statusStyleMap[rec.status] || "background:#eee;color:#333;border:1px solid #aaa;";
-    const todayStr = new Date().toLocaleDateString("en-PH", { year:"numeric", month:"long", day:"numeric" });
+    const statusStyle =
+      statusStyleMap[rec.status] ||
+      "background:#eee;color:#333;border:1px solid #aaa;";
+    const todayStr = new Date().toLocaleDateString("en-PH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
 
-    const isTerminal = ["Resolved","Escalated","Dismissed"].includes(rec.status);
-    const resBlock = isTerminal ? `
-      <div class="section-title">${rec.status === "Escalated" ? "🔺 Escalation Details" :
-        rec.status === "Dismissed" ? "🚫 Dismissal Details" : "✅ Resolution Details"}</div>
+    const isTerminal = ["Resolved", "Escalated", "Dismissed"].includes(
+      rec.status,
+    );
+    const resBlock = isTerminal
+      ? `
+      <div class="section-title">${
+        rec.status === "Escalated"
+          ? "🔺 Escalation Details"
+          : rec.status === "Dismissed"
+            ? "🚫 Dismissal Details"
+            : "✅ Resolution Details"
+      }</div>
       <table class="info-table">
         <tr>
           <td class="lbl">Date ${rec.status}</td>
@@ -888,7 +1009,8 @@ document.addEventListener("DOMContentLoaded", function () {
           <td class="lbl">Blotter Status</td>
           <td><strong>${safe(rec.status)}</strong></td>
         </tr>
-      </table>` : "";
+      </table>`
+      : "";
 
     const win = window.open("", "_blank", "width=900,height=800");
     win.document.write(`<!DOCTYPE html>
@@ -997,10 +1119,16 @@ ${resBlock}
 
   // ── Print ALL blotter records ─────────────────────────────
   function printAllRecords(records, counts) {
-    function safe(v) { return v ? String(v).replace(/</g,"&lt;").replace(/>/g,"&gt;") : "—"; }
+    function safe(v) {
+      return v ? String(v).replace(/</g, "&lt;").replace(/>/g, "&gt;") : "—";
+    }
     function fmtD(d) {
       if (!d) return "—";
-      return new Date(d).toLocaleDateString("en-PH", { year:"numeric", month:"short", day:"numeric" });
+      return new Date(d).toLocaleDateString("en-PH", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
     }
     function fmtT(t) {
       if (!t) return "—";
@@ -1008,20 +1136,25 @@ ${resBlock}
       const hr = parseInt(h);
       return `${hr % 12 || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`;
     }
-    function td2() { return "padding:5px 7px;border:1px solid #d0d0d0;font-size:10.5px;vertical-align:top;"; }
+    function td2() {
+      return "padding:5px 7px;border:1px solid #d0d0d0;font-size:10.5px;vertical-align:top;";
+    }
 
     const statusStyleMap = {
-      Pending:   "background:#fff3cd;color:#856404;border:1px solid #ffc107;",
+      Pending: "background:#fff3cd;color:#856404;border:1px solid #ffc107;",
       Scheduled: "background:#cfe2ff;color:#084298;border:1px solid #0d6efd;",
-      Ongoing:   "background:#d1ecff;color:#0c4e86;border:1px solid #3b82f6;",
-      Resolved:  "background:#d1e7dd;color:#0a3622;border:1px solid #198754;",
+      Ongoing: "background:#d1ecff;color:#0c4e86;border:1px solid #3b82f6;",
+      Resolved: "background:#d1e7dd;color:#0a3622;border:1px solid #198754;",
       Escalated: "background:#e2d9f3;color:#4a235a;border:1px solid #8b5cf6;",
       Dismissed: "background:#f8d7da;color:#842029;border:1px solid #f1aeb5;",
     };
 
-    const rows = records.map((r, i) => {
-      const ss = statusStyleMap[r.status] || "background:#eee;color:#333;border:1px solid #aaa;";
-      return `<tr style="background:${i % 2 === 0 ? "#fafaf7" : "#f3efe8"};">
+    const rows = records
+      .map((r, i) => {
+        const ss =
+          statusStyleMap[r.status] ||
+          "background:#eee;color:#333;border:1px solid #aaa;";
+        return `<tr style="background:${i % 2 === 0 ? "#fafaf7" : "#f3efe8"};">
         <td style="${td2()}">${safe(r.reference_number)}</td>
         <td style="${td2()}">${safe(r.full_name)}</td>
         <td style="${td2()}">${safe(r.age)}</td>
@@ -1034,9 +1167,14 @@ ${resBlock}
         <td style="${td2()}"><span style="${ss}padding:2px 6px;border-radius:10px;font-size:9.5px;font-weight:bold;">${safe(r.status)}</span></td>
         <td style="${td2()};max-width:160px;">${safe(r.complaint_details)}</td>
       </tr>`;
-    }).join("");
+      })
+      .join("");
 
-    const todayStr = new Date().toLocaleDateString("en-PH", { year:"numeric", month:"long", day:"numeric" });
+    const todayStr = new Date().toLocaleDateString("en-PH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
     const c = counts || {};
 
     const win = window.open("", "_blank", "width=1150,height=820");
@@ -1076,13 +1214,13 @@ ${resBlock}
 </div>
 <div class="report-title">BARANGAY BLOTTER — ALL RECORDS</div>
 <div class="summary-bar">
-  <div class="sum-card"><span class="num">${c.Total||0}</span><span class="lbl">Total</span></div>
-  <div class="sum-card"><span class="num">${c.Pending||0}</span><span class="lbl">Pending</span></div>
-  <div class="sum-card"><span class="num">${c.Scheduled||0}</span><span class="lbl">Scheduled</span></div>
-  <div class="sum-card"><span class="num">${c.Ongoing||0}</span><span class="lbl">Ongoing</span></div>
-  <div class="sum-card"><span class="num">${c.Resolved||0}</span><span class="lbl">Resolved</span></div>
-  <div class="sum-card"><span class="num">${c.Escalated||0}</span><span class="lbl">Escalated</span></div>
-  <div class="sum-card"><span class="num">${c.Dismissed||0}</span><span class="lbl">Dismissed</span></div>
+  <div class="sum-card"><span class="num">${c.Total || 0}</span><span class="lbl">Total</span></div>
+  <div class="sum-card"><span class="num">${c.Pending || 0}</span><span class="lbl">Pending</span></div>
+  <div class="sum-card"><span class="num">${c.Scheduled || 0}</span><span class="lbl">Scheduled</span></div>
+  <div class="sum-card"><span class="num">${c.Ongoing || 0}</span><span class="lbl">Ongoing</span></div>
+  <div class="sum-card"><span class="num">${c.Resolved || 0}</span><span class="lbl">Resolved</span></div>
+  <div class="sum-card"><span class="num">${c.Escalated || 0}</span><span class="lbl">Escalated</span></div>
+  <div class="sum-card"><span class="num">${c.Dismissed || 0}</span><span class="lbl">Dismissed</span></div>
 </div>
 <table>
   <thead><tr>
@@ -1103,7 +1241,7 @@ ${resBlock}
     const ex = document.querySelector(".toast");
     if (ex) ex.remove();
     const t = document.createElement("div");
-    t.className   = "toast";
+    t.className = "toast";
     t.textContent = msg;
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 3500);
