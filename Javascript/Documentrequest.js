@@ -51,10 +51,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ── Status colors (including Released) ───────────────────
   const statusColors = {
-    Pending:    { bg: "#fff3cd", color: "#856404", border: "#ffc107" },
+    Pending: { bg: "#fff3cd", color: "#856404", border: "#ffc107" },
     Processing: { bg: "#cfe2ff", color: "#084298", border: "#0d6efd" },
-    Ready:      { bg: "#d1e7dd", color: "#0a3622", border: "#198754" },
-    Released:   { bg: "#e2d9f3", color: "#4a235a", border: "#8b5cf6" },
+    Ready: { bg: "#d1e7dd", color: "#0a3622", border: "#198754" },
+    Released: { bg: "#e2d9f3", color: "#4a235a", border: "#8b5cf6" },
   };
 
   // ── Init ──────────────────────────────────────────────────
@@ -69,14 +69,19 @@ document.addEventListener("DOMContentLoaded", function () {
     searchInput.value = "";
     fetchRecords();
   });
-  searchInput.addEventListener("input", debounce(() => fetchRecords(), 400));
+  searchInput.addEventListener(
+    "input",
+    debounce(() => fetchRecords(), 400),
+  );
   btnPrint.addEventListener("click", () => window.print());
 
   // Delegated click for dynamically rendered Update buttons
   recordsContainer.addEventListener("click", function (e) {
     const btn = e.target.closest(".btn-update-record");
     if (!btn) return;
-    const rec = JSON.parse(btn.getAttribute("data-record").replace(/&apos;/g, "'"));
+    const rec = JSON.parse(
+      btn.getAttribute("data-record").replace(/&apos;/g, "'"),
+    );
     openUpdateModal(rec);
   });
 
@@ -85,15 +90,20 @@ document.addEventListener("DOMContentLoaded", function () {
     const search = searchInput.value.trim();
     const filter = filterSelect.value;
     const dateFrom = document.getElementById("date-from")
-      ? document.getElementById("date-from").value : "";
+      ? document.getElementById("date-from").value
+      : "";
     const dateTo = document.getElementById("date-to")
-      ? document.getElementById("date-to").value : "";
+      ? document.getElementById("date-to").value
+      : "";
 
     let url = "php/GetDocuments.php?";
     if (search) url += "search=" + encodeURIComponent(search) + "&";
-    if (filter && filter !== "date") url += "filter=" + encodeURIComponent(filter) + "&";
-    if (filter === "date" && dateFrom) url += "date_from=" + encodeURIComponent(dateFrom) + "&";
-    if (filter === "date" && dateTo) url += "date_to=" + encodeURIComponent(dateTo) + "&";
+    if (filter && filter !== "date")
+      url += "filter=" + encodeURIComponent(filter) + "&";
+    if (filter === "date" && dateFrom)
+      url += "date_from=" + encodeURIComponent(dateFrom) + "&";
+    if (filter === "date" && dateTo)
+      url += "date_to=" + encodeURIComponent(dateTo) + "&";
 
     recordsContainer.innerHTML = `
             <div style="display:flex;justify-content:center;align-items:center;
@@ -107,19 +117,25 @@ document.addEventListener("DOMContentLoaded", function () {
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
-        if (!data.success) { showError(data.message || "Failed to load records."); return; }
+        if (!data.success) {
+          showError(data.message || "Failed to load records.");
+          return;
+        }
         updateCounts(data.counts);
         renderTable(data.records);
       })
-      .catch((err) => { console.error(err); showError("Server error. Please try again."); });
+      .catch((err) => {
+        console.error(err);
+        showError("Server error. Please try again.");
+      });
   }
 
   // ── Summary cards ─────────────────────────────────────────
   function updateCounts(counts) {
-    setCount(document.querySelector(".total"),      counts.Total      || 0);
+    setCount(document.querySelector(".total"), counts.Total || 0);
     setCount(document.querySelector(".processing"), counts.Processing || 0);
-    setCount(document.querySelector(".pending"),    counts.Pending    || 0);
-    setCount(document.querySelector(".ready"),      counts.Ready      || 0);
+    setCount(document.querySelector(".pending"), counts.Pending || 0);
+    setCount(document.querySelector(".ready"), counts.Ready || 0);
   }
   function setCount(el, count) {
     if (!el) return;
@@ -182,16 +198,18 @@ document.addEventListener("DOMContentLoaded", function () {
       tr.style.cssText = `background-color:${i % 2 === 0 ? "#fafaf7" : "#f3efe8"};transition:background-color 0.2s;
         ${isReleased ? "opacity:0.82;" : ""}`;
       tr.onmouseover = () => (tr.style.backgroundColor = "#e8f0d8");
-      tr.onmouseout  = () => (tr.style.backgroundColor = i % 2 === 0 ? "#fafaf7" : "#f3efe8");
+      tr.onmouseout = () =>
+        (tr.style.backgroundColor = i % 2 === 0 ? "#fafaf7" : "#f3efe8");
 
       const fullName =
         `${rec.first_name || ""} ${rec.middle_initial ? rec.middle_initial + ". " : ""}${rec.last_name || ""}`.trim();
-      const sc = statusColors[rec.status] || { bg: "#eee", color: "#333", border: "#aaa" };
+      const sc = statusColors[rec.status] || {
+        bg: "#eee",
+        color: "#333",
+        border: "#aaa",
+      };
 
-      // Lock icon overlay on the Update button if Released
-      const btnLabel = isReleased
-        ? `🔒 View / Unlock`
-        : `✏ Update`;
+      const btnLabel = isReleased ? `🔒 View / Unlock` : `✏ Update`;
       const btnStyle = isReleased
         ? `background:#6c3483;`
         : `background:#375309;`;
@@ -245,7 +263,9 @@ document.addEventListener("DOMContentLoaded", function () {
   function fmtDate(d) {
     if (!d) return "—";
     return new Date(d).toLocaleDateString("en-PH", {
-      year: "numeric", month: "short", day: "numeric",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   }
   function showError(msg) {
@@ -327,7 +347,14 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         .confirm-btn-yes:hover { background:#7d9e3b; transform: translateY(-10%);}
 
-        /* Locked fields dim overlay */
+        /* Delete confirm button — red */
+        .confirm-btn-delete {
+            background:#c62828;border:none;color:#fff;
+            padding:0.8vh 2vw;border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
+        }
+        .confirm-btn-delete:hover { background:#e53935;transform:translateY(-10%); }
+
+        /* Locked fields */
         .status-locked-note {
             font-size:1.35vh;color:#6c3483;font-style:italic;margin-top:-1.5vh;margin-bottom:2vh;
             display:flex;align-items:center;gap:0.4vw;
@@ -338,6 +365,35 @@ document.addEventListener("DOMContentLoaded", function () {
             z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3);animation:slideUp 0.3s ease; }
         @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
         @keyframes fadeIn  { from{opacity:0} to{opacity:1} }
+
+        /* Image viewer overlay */
+        .img-viewer-overlay {
+            position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:19999;
+            display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;
+        }
+        .img-viewer-box {
+            background:#1a1a1a;border-radius:12px;padding:2vh 2vw;
+            max-width:80vw;max-height:90vh;display:flex;flex-direction:column;
+            align-items:center;gap:1.5vh;box-shadow:0 20px 60px rgba(0,0,0,0.8);
+        }
+        .img-viewer-title {
+            color:#f3efe8;font-family:'Segoe UI',sans-serif;font-size:1.6vh;font-weight:700;
+            align-self:flex-start;opacity:0.8;
+        }
+        .img-viewer-img {
+            max-width:70vw;max-height:75vh;border-radius:8px;object-fit:contain;
+            box-shadow:0 4px 20px rgba(0,0,0,0.5);
+        }
+        .img-viewer-close {
+            background:#cc0000;color:white;border:none;border-radius:8px;
+            padding:0.8vh 2vw;font-size:1.5vh;font-weight:700;cursor:pointer;
+            transition:background 0.2s;align-self:flex-end;
+        }
+        .img-viewer-close:hover { background:#ff3333; }
+        .img-viewer-none {
+            color:#aaa;font-size:1.6vh;font-family:'Segoe UI',sans-serif;
+            padding:4vh 2vw;text-align:center;
+        }
     `;
   document.head.appendChild(style);
 
@@ -365,22 +421,27 @@ document.addEventListener("DOMContentLoaded", function () {
         ? '<span style="color:#0a3622;font-weight:700;">Free</span>'
         : `<span style="color:#0a3622;font-weight:700;">₱${parseFloat(rec.price).toFixed(2)}</span>`;
 
-    // Status badge colors
-    const sc = statusColors[rec.status] || { bg: "#eee", color: "#333", border: "#aaa" };
+    const sc = statusColors[rec.status] || {
+      bg: "#eee",
+      color: "#333",
+      border: "#aaa",
+    };
     const statusBadge = `<span style="
         margin-left:1vw;padding:0.3vh 0.8vw;border-radius:20px;font-size:1.4vh;
         background:${sc.bg};color:${sc.color};border:1px solid ${sc.border};">
         ${rec.status}
     </span>`;
 
-    // Build status select options — always show all 4
     const statuses = ["Pending", "Processing", "Ready", "Released"];
-    const statusOptions = statuses.map(s =>
-      `<option value="${s}" ${rec.status === s ? "selected" : ""}>${s}</option>`
-    ).join("");
+    const statusOptions = statuses
+      .map(
+        (s) =>
+          `<option value="${s}" ${rec.status === s ? "selected" : ""}>${s}</option>`,
+      )
+      .join("");
 
-    // Lock banner shown only when Released
-    const lockBanner = isReleased ? `
+    const lockBanner = isReleased
+      ? `
         <div class="locked-banner">
             <span class="locked-banner-icon">🔒</span>
             <div class="locked-banner-text">
@@ -388,18 +449,50 @@ document.addEventListener("DOMContentLoaded", function () {
                 This document has been marked as <strong>Released</strong> and is now locked for security purposes.
                 You can still view all information. To make changes, unlock the record by selecting a different status and saving.
             </div>
-        </div>` : "";
+        </div>`
+      : "";
 
-    // Select is always enabled — unlock button controls it visually
-    const selectDisabled = "";
-    const selectNote = "";
+    // ── Determine if there's an image to show ─────────────────
+    const hasImage = rec.id_image_path && rec.id_image_path.trim() !== "";
 
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
     overlay.id = "update-modal";
     overlay.innerHTML = `
             <div class="modal-box" style="width:38vw;min-width:320px;max-height:85vh;overflow-y:auto;">
-                <div class="modal-title">Request Details #${rec.request_ID}</div>
+
+                <!-- Modal Title Row with Action Buttons -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2vh;gap:0.6vw;flex-wrap:wrap;">
+                    <div class="modal-title" style="margin-bottom:0;">Request Details #${rec.request_ID}</div>
+                    <div style="display:flex;gap:0.5vw;flex-wrap:wrap;">
+
+                        <!-- View Image Button -->
+                        <button onclick="viewDocumentImage('${(rec.id_image_path || "").replace(/'/g, "\\'")}')"
+                            title="View uploaded ID image"
+                            style="background:${hasImage ? "#1565c0" : "#9e9e9e"};color:#fff;border:none;border-radius:7px;
+                                padding:0.5vh 0.9vw;font-size:1.3vh;font-weight:700;
+                                cursor:${hasImage ? "pointer" : "not-allowed"};
+                                display:flex;align-items:center;gap:0.4vw;transition:0.2s;
+                                opacity:${hasImage ? "1" : "0.6"};white-space:nowrap;"
+                            onmouseover="if(${hasImage}) this.style.background='#1e88e5'"
+                            onmouseout="if(${hasImage}) this.style.background='${hasImage ? "#1565c0" : "#9e9e9e"}'"
+                            ${hasImage ? "" : "disabled"}>
+                            🖼️ View Image
+                        </button>
+
+                        <!-- Delete Button -->
+                        <button onclick="confirmDeleteDocument(${rec.request_ID}, '${rec.document_refnumber}')"
+                            title="Permanently delete this request"
+                            style="background:#c62828;color:#fff;border:none;border-radius:7px;
+                                padding:0.5vh 0.9vw;font-size:1.3vh;font-weight:700;cursor:pointer;
+                                display:flex;align-items:center;gap:0.4vw;transition:0.2s;white-space:nowrap;"
+                            onmouseover="this.style.background='#e53935'"
+                            onmouseout="this.style.background='#c62828'">
+                            🗑️ Delete
+                        </button>
+
+                    </div>
+                </div>
 
                 ${lockBanner}
 
@@ -438,7 +531,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     <div style="font-size:1.3vh;color:${isReleased ? "#6c3483" : "#856404"};font-weight:700;margin-bottom:1vh;letter-spacing:0.05em;
                         display:flex;align-items:center;justify-content:space-between;">
                         <span>${isReleased ? "🔒 RECORD STATUS (LOCKED)" : "UPDATE STATUS"}</span>
-                        ${isReleased ? `
+                        ${
+                          isReleased
+                            ? `
                         <button id="btn-unlock-record" style="
                             background:#6c3483;color:white;border:none;border-radius:6px;
                             padding:0.5vh 1vw;font-size:1.3vh;font-weight:700;cursor:pointer;
@@ -447,7 +542,9 @@ document.addEventListener("DOMContentLoaded", function () {
                             onmouseout="this.style.background='#6c3483'"
                             onclick="unlockRecord()">
                             🔓 Unlock to Edit
-                        </button>` : ""}
+                        </button>`
+                            : ""
+                        }
                     </div>
                     <label class="modal-label">Current Status: ${statusBadge}</label>
                     <label class="modal-label" style="margin-top:1.5vh;">New Status</label>
@@ -455,12 +552,16 @@ document.addEventListener("DOMContentLoaded", function () {
                         style="${isReleased ? "opacity:0.5;cursor:not-allowed;pointer-events:none;" : ""}">
                         ${statusOptions}
                     </select>
-                    ${isReleased ? `
+                    ${
+                      isReleased
+                        ? `
                     <div id="locked-hint" style="font-size:1.35vh;color:#6c3483;background:#ede7f6;padding:0.8vh 1vw;
                         border-radius:7px;margin-top:-1vh;margin-bottom:0.5vh;">
                         🔒 Click <strong>"Unlock to Edit"</strong> above to change the status.
                         If you set it to a non-Released status, the date released will be cleared automatically.
-                    </div>` : ""}
+                    </div>`
+                        : ""
+                    }
                 </div>
 
                 <div class="modal-buttons">
@@ -476,52 +577,150 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     document.body.appendChild(overlay);
 
-    // Unlock button handler — clears date_released in DB immediately, then enables the select
+    // Unlock button handler
     window.unlockRecord = function () {
-      const select    = document.getElementById("modal-status-select");
-      const hint      = document.getElementById("locked-hint");
+      const select = document.getElementById("modal-status-select");
+      const hint = document.getElementById("locked-hint");
       const unlockBtn = document.getElementById("btn-unlock-record");
 
-      if (unlockBtn) { unlockBtn.disabled = true; unlockBtn.textContent = "Unlocking…"; }
+      if (unlockBtn) {
+        unlockBtn.disabled = true;
+        unlockBtn.textContent = "Unlocking…";
+      }
 
-      // POST to PHP: keep current status but signal to wipe date_released NOW
       fetch("php/GetDocuments.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           request_ID: rec.request_ID,
           status: rec.status,
-          clear_date_released: true
+          clear_date_released: true,
         }),
       })
-        .then(r => r.json())
+        .then((r) => r.json())
         .then(() => {
-          select.style.opacity       = "1";
-          select.style.cursor        = "pointer";
+          select.style.opacity = "1";
+          select.style.cursor = "pointer";
           select.style.pointerEvents = "auto";
           select.value = "Pending";
-          if (hint)      hint.style.display      = "none";
-          if (unlockBtn) unlockBtn.style.display  = "none";
+          if (hint) hint.style.display = "none";
+          if (unlockBtn) unlockBtn.style.display = "none";
         })
         .catch(() => {
-          if (unlockBtn) { unlockBtn.disabled = false; unlockBtn.textContent = "🔓 Unlock to Edit"; }
+          if (unlockBtn) {
+            unlockBtn.disabled = false;
+            unlockBtn.textContent = "🔓 Unlock to Edit";
+          }
           showToast("❌ Failed to unlock. Please try again.");
         });
     };
   }
+
+  // ── View Image ────────────────────────────────────────────
+  window.viewDocumentImage = function (imagePath) {
+    if (!imagePath || imagePath.trim() === "") {
+      showToast("⚠️ No image available for this record.");
+      return;
+    }
+
+    const existing = document.getElementById("img-viewer-modal");
+    if (existing) existing.remove();
+
+    const viewerOverlay = document.createElement("div");
+    viewerOverlay.className = "img-viewer-overlay";
+    viewerOverlay.id = "img-viewer-modal";
+    viewerOverlay.innerHTML = `
+      <div class="img-viewer-box">
+        <div class="img-viewer-title">📎 Uploaded ID — ${imagePath.split("/").pop()}</div>
+        <img class="img-viewer-img"
+          src="${imagePath}"
+          alt="ID Image"
+          onerror="this.style.display='none';document.getElementById('img-load-err').style.display='block'">
+        <div id="img-load-err" class="img-viewer-none" style="display:none;">
+          ⚠️ Image could not be loaded.<br>
+          <small style="opacity:0.7;">${imagePath}</small>
+        </div>
+        <button class="img-viewer-close" onclick="document.getElementById('img-viewer-modal').remove()">
+          ✕ Close
+        </button>
+      </div>`;
+
+    viewerOverlay.addEventListener("click", (e) => {
+      if (e.target === viewerOverlay) viewerOverlay.remove();
+    });
+    document.body.appendChild(viewerOverlay);
+  };
+
+  // ── Delete confirmation ───────────────────────────────────
+  window.confirmDeleteDocument = function (requestId, refNumber) {
+    const existing = document.getElementById("confirm-modal");
+    if (existing) existing.remove();
+
+    const confirmOverlay = document.createElement("div");
+    confirmOverlay.className = "confirm-overlay";
+    confirmOverlay.id = "confirm-modal";
+    confirmOverlay.innerHTML = `
+      <div class="confirm-box">
+        <div style="font-size:4.5vh;margin-bottom:1.5vh;">🗑️</div>
+        <div class="confirm-title" style="color:#c62828;">Delete Document Request?</div>
+        <div class="confirm-msg">
+          Are you sure you want to permanently delete<br>
+          <strong>${refNumber}</strong>?
+        </div>
+        <div class="confirm-note" style="background:#fff5f5;border-color:#f1aeb5;color:#842029;">
+          <strong>⚠️ This action cannot be undone.</strong><br>
+          The document request and all its associated data will be permanently removed from the system.
+        </div>
+        <div class="confirm-buttons">
+          <button class="confirm-btn-no" onclick="document.getElementById('confirm-modal').remove()">
+            No, Keep It
+          </button>
+          <button class="confirm-btn-delete" onclick="doDeleteDocument(${requestId})">
+            🗑️ Yes, Delete
+          </button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(confirmOverlay);
+  };
+
+  window.doDeleteDocument = function (requestId) {
+    const confirmModal = document.getElementById("confirm-modal");
+    if (confirmModal) confirmModal.remove();
+
+    fetch("php/GetDocuments.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ request_ID: requestId, action: "delete" }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const modal = document.getElementById("update-modal");
+        if (modal) modal.remove();
+        showToast(
+          data.success
+            ? "🗑️ Document request deleted successfully."
+            : "❌ " + (data.message || "Delete failed."),
+        );
+        if (data.success) fetchRecords();
+      })
+      .catch(() => {
+        const modal = document.getElementById("update-modal");
+        if (modal) modal.remove();
+        showToast("❌ Server error. Please try again.");
+      });
+  };
 
   // ── Save status (with confirmation if setting to Released) ─
   window.saveStatus = function (requestId) {
     const selectEl = document.getElementById("modal-status-select");
     const newStatus = selectEl.value;
 
-    // If saving AS Released → show confirmation first
     if (newStatus === "Released") {
       showReleaseConfirmation(requestId);
       return;
     }
 
-    // Otherwise just save directly
     doSave(requestId, newStatus);
   };
 
@@ -529,11 +728,10 @@ document.addEventListener("DOMContentLoaded", function () {
     const existing = document.getElementById("confirm-modal");
     if (existing) existing.remove();
 
-    // Pre-fill today's date in PH local time (YYYY-MM-DD)
     const todayLocal = new Date();
     const yyyy = todayLocal.getFullYear();
-    const mm   = String(todayLocal.getMonth() + 1).padStart(2, "0");
-    const dd   = String(todayLocal.getDate()).padStart(2, "0");
+    const mm = String(todayLocal.getMonth() + 1).padStart(2, "0");
+    const dd = String(todayLocal.getDate()).padStart(2, "0");
     const todayStr = `${yyyy}-${mm}-${dd}`;
 
     const confirmOverlay = document.createElement("div");
@@ -592,7 +790,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function doSave(requestId, newStatus, dateReleased) {
     const saveBtn = document.getElementById("modal-save-btn");
-    if (saveBtn) { saveBtn.textContent = "Saving…"; saveBtn.disabled = true; }
+    if (saveBtn) {
+      saveBtn.textContent = "Saving…";
+      saveBtn.disabled = true;
+    }
 
     const payload = { request_ID: requestId, status: newStatus };
     if (dateReleased) payload.date_released = dateReleased;
@@ -608,12 +809,14 @@ document.addEventListener("DOMContentLoaded", function () {
         if (modal) modal.remove();
         showToast(
           data.success
-            ? (newStatus === "Released"
-                ? "✅ Document marked as Released and locked."
-                : newStatus === "Pending" || newStatus === "Processing" || newStatus === "Ready"
-                  ? "🔓 Record unlocked. Status updated to " + newStatus + "."
-                  : "✅ Status updated to " + newStatus)
-            : "❌ " + (data.message || "Update failed.")
+            ? newStatus === "Released"
+              ? "✅ Document marked as Released and locked."
+              : newStatus === "Pending" ||
+                  newStatus === "Processing" ||
+                  newStatus === "Ready"
+                ? "🔓 Record unlocked. Status updated to " + newStatus + "."
+                : "✅ Status updated to " + newStatus
+            : "❌ " + (data.message || "Update failed."),
         );
         if (data.success) fetchRecords();
       })
