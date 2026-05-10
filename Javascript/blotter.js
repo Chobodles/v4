@@ -152,7 +152,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // ── Summary cards ─────────────────────────────────────────
-  // NOTE: DB counts keys: Total, Pending, Scheduled, Ongoing, Resolved, Escalated, Dismissed
   function updateCounts(counts) {
     setCount(document.querySelector(".total"),      counts.Total     || 0);
     setCount(document.querySelector(".processing"), counts.Scheduled || 0);
@@ -209,7 +208,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     records.forEach((rec, i) => {
       const tr = document.createElement("tr");
-      // Locked = terminal status
       const isLocked = rec.status === "Resolved" || rec.status === "Escalated" || rec.status === "Dismissed";
       tr.style.cssText = `background-color:${i % 2 === 0 ? "#fafaf7" : "#f3efe8"};transition:background-color 0.2s;
         ${isLocked ? "opacity:0.85;" : ""}`;
@@ -300,7 +298,7 @@ document.addEventListener("DOMContentLoaded", function () {
       font-size:1.7vh;background:white;color:#273b07;margin-bottom:2.5vh;cursor:pointer;outline:none;
     }
     .modal-select:focus { border-color:#375309; }
-    .modal-buttons { display:flex;gap:1vw;justify-content:flex-end;margin-top:2vh; }
+    .modal-buttons { display:flex;gap:0.7vw;justify-content:flex-end;margin-top:2vh;flex-wrap:wrap;align-items:center; }
     .modal-btn-cancel {
       background:transparent;border:2px solid #375309;color:#375309;
       padding:0.8vh 1.5vw;border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
@@ -311,6 +309,22 @@ document.addEventListener("DOMContentLoaded", function () {
       border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
     }
     .modal-btn-save:hover { background:#7d9e3b; }
+
+    /* ── NEW: Delete & View Image buttons ── */
+    .modal-btn-delete {
+      background:#c0392b;border:none;color:#fff;padding:0.8vh 1.5vw;
+      border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
+      margin-right:auto;
+    }
+    .modal-btn-delete:hover { background:#e74c3c; }
+    .modal-btn-viewimg {
+      background:#1565c0;border:none;color:#fff;padding:0.8vh 1.5vw;
+      border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
+    }
+    .modal-btn-viewimg:hover { background:#1976d2; }
+    .modal-btn-viewimg:disabled {
+      background:#90a4ae;cursor:not-allowed;opacity:0.7;
+    }
 
     .modal-section-title {
       font-size:1.3vh;font-weight:700;margin-bottom:1vh;letter-spacing:0.05em;text-transform:uppercase;
@@ -323,6 +337,54 @@ document.addEventListener("DOMContentLoaded", function () {
     .locked-banner-icon { font-size:2.2vh;flex-shrink:0;margin-top:0.1vh; }
     .locked-banner-text { font-size:1.4vh;color:#4a235a;line-height:1.6; }
     .locked-banner-text strong { font-size:1.5vh; }
+
+    /* Delete confirmation */
+    .delete-overlay {
+      position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:11000;
+      display:flex;align-items:center;justify-content:center;animation:fadeIn 0.15s ease;
+    }
+    .delete-box {
+      background:#fff;border-radius:15px;padding:3vh 2.5vw;width:30vw;min-width:280px;
+      box-shadow:0 12px 50px rgba(0,0,0,0.5);font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;
+    }
+    .delete-icon { font-size:5vh;margin-bottom:1.5vh; }
+    .delete-title { font-size:2vh;font-weight:700;color:#c0392b;margin-bottom:1vh; }
+    .delete-msg { font-size:1.45vh;color:#555;margin-bottom:1.5vh;line-height:1.6; }
+    .delete-warning {
+      background:#fff5f5;border:1.5px solid #e74c3c;border-radius:8px;
+      padding:1vh 1vw;font-size:1.3vh;color:#c0392b;margin:0 0 2vh;text-align:left;line-height:1.6;
+    }
+    .delete-buttons { display:flex;gap:1vw;justify-content:center; }
+    .delete-btn-no {
+      background:transparent;border:2px solid #273b07;color:#273b07;
+      padding:0.8vh 2vw;border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
+    }
+    .delete-btn-no:hover { background:#273b07;color:#f3efe8;transform:translateY(-2px); }
+    .delete-btn-yes {
+      background:#c0392b;border:none;color:#fff;
+      padding:0.8vh 2vw;border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
+    }
+    .delete-btn-yes:hover { background:#e74c3c;transform:translateY(-2px); }
+
+    /* Image lightbox */
+    .img-overlay {
+      position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:12000;
+      display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;
+      flex-direction:column;gap:2vh;
+    }
+    .img-overlay img {
+      max-width:85vw;max-height:80vh;border-radius:10px;
+      box-shadow:0 8px 40px rgba(0,0,0,0.6);object-fit:contain;
+    }
+    .img-close-btn {
+      background:#f3efe8;color:#273b07;border:none;border-radius:8px;
+      padding:1vh 2.5vw;font-size:1.7vh;font-weight:700;cursor:pointer;transition:0.2s;
+    }
+    .img-close-btn:hover { background:#fff;transform:translateY(-2px); }
+    .img-no-image {
+      color:#f3efe8;font-size:2vh;font-family:'Segoe UI',sans-serif;
+      background:rgba(255,255,255,0.1);padding:3vh 4vw;border-radius:12px;text-align:center;
+    }
 
     .confirm-overlay {
       position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10999;
@@ -371,7 +433,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const existing = document.getElementById("update-modal");
     if (existing) existing.remove();
 
-    // Terminal statuses lock the record
     const isLocked = rec.status === "Resolved" || rec.status === "Escalated" || rec.status === "Dismissed";
     const sc = statusColors[rec.status] || { bg:"#eee", color:"#333", border:"#aaa" };
 
@@ -397,15 +458,16 @@ document.addEventListener("DOMContentLoaded", function () {
         </div>
       </div>` : "";
 
-    // All valid statuses from DB enum
     const statuses = ["Pending", "Scheduled", "Ongoing", "Resolved", "Escalated", "Dismissed"];
     const statusOptions = statuses.map(s =>
       `<option value="${s}" ${rec.status === s ? "selected" : ""}>${s}</option>`
     ).join("");
 
-    // resolved_at section — shown when status is or becomes terminal
     const resolvedAtVal = rec.resolved_at ? rec.resolved_at.split("T")[0] : "";
     const showResolved  = isLocked;
+
+    // View Image button — enabled only if id_image_path exists
+    const hasImage = rec.id_image_path && rec.id_image_path.trim() !== "";
 
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
@@ -443,7 +505,7 @@ document.addEventListener("DOMContentLoaded", function () {
           ${field("Date Submitted", fmtDate(rec.submitted_at))}
         </div>
 
-        <!-- SECTION 2: Resolution date (shown for terminal statuses) -->
+        <!-- SECTION 2: Resolution date -->
         <div id="resolution-section" style="${showResolved ? "" : "display:none;"}">
           <div style="background:#fff8e6;border-radius:10px;padding:1.5vh 1.5vw;margin-bottom:1.5vh;
             border:1.5px solid #ffc107;">
@@ -485,7 +547,21 @@ document.addEventListener("DOMContentLoaded", function () {
           </div>` : ""}
         </div>
 
+        <!-- ACTION BUTTONS -->
         <div class="modal-buttons">
+          <!-- Delete on the far left -->
+          <button class="modal-btn-delete" onclick="confirmDeleteBlotter(${rec.blotter_id}, '${(rec.reference_number || "").replace(/'/g, "\\'")}')">
+            🗑️ Delete
+          </button>
+
+          <!-- View Image -->
+          <button class="modal-btn-viewimg"
+            ${!hasImage ? "disabled title='No ID image on file'" : `onclick="viewBlotterImage('${rec.id_image_path.replace(/'/g, "\\'")}')"`}
+          >
+            🖼️ View ID Image
+          </button>
+
+          <!-- Cancel & Save on the right -->
           <button class="modal-btn-cancel" onclick="document.getElementById('update-modal').remove()">Cancel</button>
           <button class="modal-btn-save" id="modal-save-btn" onclick="saveBlotterStatus(${rec.blotter_id})">
             Save Changes
@@ -508,7 +584,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
 
-    // ── Unlock handler (clears resolved_at in DB) ──────────
+    // ── Unlock handler ─────────────────────────────────────
     window.unlockRecord = function () {
       const select    = document.getElementById("modal-status-select");
       const hint      = document.getElementById("locked-hint");
@@ -538,6 +614,104 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     };
   }
+
+  // ── View ID Image lightbox ────────────────────────────────
+  window.viewBlotterImage = function (imagePath) {
+    const existing = document.getElementById("img-lightbox");
+    if (existing) existing.remove();
+
+    const lightbox = document.createElement("div");
+    lightbox.className = "img-overlay";
+    lightbox.id = "img-lightbox";
+
+    // Build the image URL — handle both relative and absolute paths
+    const imgSrc = imagePath.startsWith("http") ? imagePath : ("php/" + imagePath).replace("php/php/", "php/");
+
+    lightbox.innerHTML = `
+      <div style="text-align:center;">
+        <p style="color:#f3efe8;font-size:1.4vh;font-family:'Segoe UI',sans-serif;margin:0 0 1.5vh;
+          opacity:0.75;letter-spacing:0.5px;">🪪 Submitted ID Image</p>
+        <img src="${imgSrc}"
+          onerror="this.style.display='none';document.getElementById('img-err').style.display='block';"
+          alt="ID Image" />
+        <div id="img-err" style="display:none;color:#f3efe8;font-size:1.6vh;
+          font-family:'Segoe UI',sans-serif;padding:3vh 4vw;
+          background:rgba(255,255,255,0.08);border-radius:10px;margin-top:1vh;">
+          ⚠️ Image could not be loaded.<br>
+          <span style="font-size:1.3vh;opacity:0.7;">Path: ${imagePath}</span>
+        </div>
+      </div>
+      <button class="img-close-btn" onclick="document.getElementById('img-lightbox').remove()">
+        ✕ Close
+      </button>`;
+
+    lightbox.addEventListener("click", e => {
+      if (e.target === lightbox) lightbox.remove();
+    });
+    document.body.appendChild(lightbox);
+  };
+
+  // ── Delete blotter confirmation ───────────────────────────
+  window.confirmDeleteBlotter = function (blotterId, refNumber) {
+    const existing = document.getElementById("delete-modal");
+    if (existing) existing.remove();
+
+    const deleteOverlay = document.createElement("div");
+    deleteOverlay.className = "delete-overlay";
+    deleteOverlay.id = "delete-modal";
+    deleteOverlay.innerHTML = `
+      <div class="delete-box">
+        <div class="delete-icon">🗑️</div>
+        <div class="delete-title">Delete Blotter Record?</div>
+        <div class="delete-msg">
+          You are about to permanently delete blotter record<br>
+          <strong style="font-family:'Courier New',monospace;letter-spacing:1px;">${refNumber}</strong>
+        </div>
+        <div class="delete-warning">
+          ⚠️ <strong>This action cannot be undone.</strong><br>
+          All data associated with this record, including the uploaded ID image reference, will be permanently removed from the system.
+        </div>
+        <div class="delete-buttons">
+          <button class="delete-btn-no" onclick="document.getElementById('delete-modal').remove()">
+            No, Keep It
+          </button>
+          <button class="delete-btn-yes" onclick="executeDeleteBlotter(${blotterId})">
+            🗑️ Yes, Delete
+          </button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(deleteOverlay);
+  };
+
+  window.executeDeleteBlotter = function (blotterId) {
+    const deleteModal  = document.getElementById("delete-modal");
+    const updateModal  = document.getElementById("update-modal");
+    const yesBtn = deleteModal ? deleteModal.querySelector(".delete-btn-yes") : null;
+
+    if (yesBtn) { yesBtn.textContent = "Deleting…"; yesBtn.disabled = true; }
+
+    fetch("php/DeleteBlotter.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ blotter_id: blotterId }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (deleteModal) deleteModal.remove();
+        if (updateModal) updateModal.remove();
+        if (data.success) {
+          showToast("🗑️ Blotter record deleted successfully.");
+          fetchRecords();
+        } else {
+          showToast("❌ " + (data.message || "Delete failed."));
+        }
+      })
+      .catch(() => {
+        if (deleteModal) deleteModal.remove();
+        showToast("❌ Server error. Please try again.");
+      });
+  };
 
   // ── Save main status ──────────────────────────────────────
   window.saveBlotterStatus = function (blotterId) {
@@ -620,7 +794,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const saveBtn = document.getElementById("modal-save-btn");
     if (saveBtn) { saveBtn.textContent = "Saving…"; saveBtn.disabled = true; }
 
-    // Payload matches GetBlotter.php POST action: update_status
     const payload = {
       blotter_id: blotterId,
       action:     "update_status",
@@ -661,14 +834,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const modal = document.getElementById("update-modal");
     if (!modal) return;
 
-    // Get the rec from the open modal's save button data-blotter-id
-    // We derive it from the currently open record via the modal title
-    // (rec was embedded in the button's onclick attr; pull from modal DOM)
     const saveBtn = document.getElementById("modal-save-btn");
     if (!saveBtn) return;
 
-    // Re-fetch the record by its blotter_id embedded in the onclick attr
-    // e.g. onclick="saveBlotterStatus(2)" → id=2
     const onclickVal = saveBtn.getAttribute("onclick") || "";
     const idMatch = onclickVal.match(/\d+/);
     if (!idMatch) return;
@@ -709,7 +877,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const statusStyle = statusStyleMap[rec.status] || "background:#eee;color:#333;border:1px solid #aaa;";
     const todayStr = new Date().toLocaleDateString("en-PH", { year:"numeric", month:"long", day:"numeric" });
 
-    // Resolution block only for terminal statuses
     const isTerminal = ["Resolved","Escalated","Dismissed"].includes(rec.status);
     const resBlock = isTerminal ? `
       <div class="section-title">${rec.status === "Escalated" ? "🔺 Escalation Details" :
@@ -767,7 +934,6 @@ document.addEventListener("DOMContentLoaded", function () {
 </head>
 <body>
 <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
-
 <div class="form-header">
   <img class="form-logo" src="../photos/logo.png.png" alt="Barangay Logo" onerror="this.style.display='none'">
   <div class="header-text">
@@ -786,91 +952,43 @@ document.addEventListener("DOMContentLoaded", function () {
     </span>
   </div>
 </div>
-
 <div class="form-title">BARANGAY BLOTTER</div>
-
 <span class="field-label">NAME</span>
 <span class="field-value">${safe(rec.full_name)}</span>
-
 <div class="row2">
-  <div class="col">
-    <span class="field-label">AGE</span>
-    <span class="field-value">${safe(rec.age)}</span>
-  </div>
-  <div class="col">
-    <span class="field-label">CIVIL STATUS</span>
-    <span class="field-value">${safe(rec.civil_status)}</span>
-  </div>
+  <div class="col"><span class="field-label">AGE</span><span class="field-value">${safe(rec.age)}</span></div>
+  <div class="col"><span class="field-label">CIVIL STATUS</span><span class="field-value">${safe(rec.civil_status)}</span></div>
 </div>
-
-<span class="field-label">ADDRESS</span>
-<span class="field-value">${safe(rec.address)}</span>
-
-<span class="field-label">OCCUPATION</span>
-<span class="field-value">${safe(rec.occupation)}</span>
-
+<span class="field-label">ADDRESS</span><span class="field-value">${safe(rec.address)}</span>
+<span class="field-label">OCCUPATION</span><span class="field-value">${safe(rec.occupation)}</span>
 <hr class="divider">
-
 <div class="row2">
-  <div class="col">
-    <span class="field-label">PETSA (DATE)</span>
-    <span class="field-value">${safe(fmtD(rec.petsa))}</span>
-  </div>
-  <div class="col">
-    <span class="field-label">ORAS (TIME)</span>
-    <span class="field-value">${safe(fmtT(rec.oras))}</span>
-  </div>
+  <div class="col"><span class="field-label">PETSA (DATE)</span><span class="field-value">${safe(fmtD(rec.petsa))}</span></div>
+  <div class="col"><span class="field-label">ORAS (TIME)</span><span class="field-value">${safe(fmtT(rec.oras))}</span></div>
 </div>
-
-<span class="field-label">NAGSADYA DITO SI (COMPLAINANT)</span>
-<span class="field-value">${safe(rec.complaint_against)}</span>
-
-<span class="field-label">COMPLAINT TYPE</span>
-<span class="field-value">${safe(rec.complaint_type)}</span>
-
+<span class="field-label">NAGSADYA DITO SI (COMPLAINANT)</span><span class="field-value">${safe(rec.complaint_against)}</span>
+<span class="field-label">COMPLAINT TYPE</span><span class="field-value">${safe(rec.complaint_type)}</span>
 <span class="field-label">REKLAMO / TULONG (DETAILS)</span>
 <div class="complaint-block">${safe(rec.complaint_details)}</div>
-
 <div class="location-footer">
-  Ipinatala ganap na ika
-  <span class="fill" style="min-width:80px;">&nbsp;</span>
+  Ipinatala ganap na ika <span class="fill" style="min-width:80px;">&nbsp;</span>
   ng, ika <span class="fill" style="min-width:36px;">&nbsp;</span>
   ng <span class="fill" style="min-width:110px;">&nbsp;</span>, 20<span class="fill" style="min-width:36px;">&nbsp;</span>
-  <br>
-  Tanggapan ng Punong Barangay, Tugtug, San Jose, Batangas.
+  <br>Tanggapan ng Punong Barangay, Tugtug, San Jose, Batangas.
 </div>
-
 <hr class="divider">
-
 <div class="sig-section">
   <div class="sig-row" style="margin-bottom:20px;">
-    <div class="sig-col" style="flex:2;">
-      <div class="sig-line"></div>
-      <div class="sig-lbl">Pangalan / Lagda sa Ibabaw ng Nagrereklamo</div>
-    </div>
+    <div class="sig-col" style="flex:2;"><div class="sig-line"></div><div class="sig-lbl">Pangalan / Lagda sa Ibabaw ng Nagrereklamo</div></div>
   </div>
   <div class="sig-row">
-    <div class="sig-col">
-      <div class="sig-line"></div>
-      <div class="sig-lbl">SAKSI (Witness)</div>
-    </div>
-    <div class="sig-col">
-      <div class="sig-line"></div>
-      <div class="sig-lbl">SAKSI (Witness)</div>
-    </div>
-    <div class="sig-col">
-      <div class="sig-line"></div>
-      <div class="sig-lbl">NAGPATOTOO:<br>Kagawad on Duty</div>
-    </div>
+    <div class="sig-col"><div class="sig-line"></div><div class="sig-lbl">SAKSI (Witness)</div></div>
+    <div class="sig-col"><div class="sig-line"></div><div class="sig-lbl">SAKSI (Witness)</div></div>
+    <div class="sig-col"><div class="sig-line"></div><div class="sig-lbl">NAGPATOTOO:<br>Kagawad on Duty</div></div>
   </div>
 </div>
-
 ${resBlock}
-
-<div class="page-footer">
-  Printed on: ${todayStr} &nbsp;|&nbsp; Barangay Tugtug E-System &nbsp;|&nbsp; Ref: ${safe(rec.reference_number)}
-</div>
-
+<div class="page-footer">Printed on: ${todayStr} &nbsp;|&nbsp; Barangay Tugtug E-System &nbsp;|&nbsp; Ref: ${safe(rec.reference_number)}</div>
 </body></html>`);
     win.document.close();
     win.focus();
@@ -923,15 +1041,12 @@ ${resBlock}
 
     const win = window.open("", "_blank", "width=1150,height=820");
     win.document.write(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Barangay Blotter — All Records</title>
+<html lang="en"><head><meta charset="UTF-8"><title>Barangay Blotter — All Records</title>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'Times New Roman',Times,serif;font-size:11px;color:#000;background:#fff;padding:28px 36px;}
   @media print{body{padding:0;}@page{size:A3 landscape;margin:1.2cm 1.5cm;}.no-print{display:none!important;}}
-  .print-btn{display:block;margin:0 auto 18px;padding:9px 28px;background:#032f15;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;letter-spacing:1px;}
+  .print-btn{display:block;margin:0 auto 18px;padding:9px 28px;background:#032f15;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;}
   .print-btn:hover{background:#054d22;}
   .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
   .header-logo{width:60px;height:auto;}
@@ -940,25 +1055,22 @@ ${resBlock}
   .header-text .brgy{font-size:18px;font-weight:bold;color:#032f15;margin:2px 0;}
   .header-text .off{font-size:11px;font-weight:bold;}
   .report-title{text-align:center;font-size:13px;font-weight:bold;letter-spacing:2px;border-top:2px solid #000;border-bottom:2px solid #000;padding:4px 0;margin:6px 0 12px;}
-  .summary-bar{display:table;width:100%;border-collapse:collapse;border:1px solid #c8c8c8;border-radius:4px;margin-bottom:12px;background:#f9f9f4;}
+  .summary-bar{display:table;width:100%;border-collapse:collapse;border:1px solid #c8c8c8;margin-bottom:12px;background:#f9f9f4;}
   .sum-card{display:table-cell;text-align:center;padding:5px 10px;border-right:1px solid #ddd;vertical-align:middle;}
   .sum-card:last-child{border-right:none;}
-  .sum-card .num{font-size:13px;font-weight:bold;color:#032f15;display:inline;}
-  .sum-card .lbl{font-size:9.5px;text-transform:uppercase;color:#555;letter-spacing:0.4px;display:inline;margin-left:4px;}
+  .sum-card .num{font-size:13px;font-weight:bold;color:#032f15;}
+  .sum-card .lbl{font-size:9.5px;text-transform:uppercase;color:#555;letter-spacing:0.4px;margin-left:4px;}
   table{width:100%;border-collapse:collapse;}
   thead tr{background:#273b07;color:#f3efe8;}
   thead th{padding:6px 7px;text-align:left;font-size:10px;font-weight:600;white-space:nowrap;border:1px solid #1a2d05;}
   .footer{margin-top:14px;padding-top:6px;border-top:1px solid #ccc;font-size:9px;color:#888;text-align:center;}
-</style>
-</head>
-<body>
+</style></head><body>
 <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
 <div class="header">
   <img class="header-logo" src="../photos/logo.png.png" alt="Logo" onerror="this.style.display='none'">
   <div class="header-text">
     <p class="sm">Republic of the Philippines &nbsp;|&nbsp; PROVINCE OF BATANGAS &nbsp;|&nbsp; Municipality of San Jose</p>
-    <p class="brgy">Barangay Tugtug</p>
-    <p class="off">OFFICE OF THE PUNONG BARANGAY</p>
+    <p class="brgy">Barangay Tugtug</p><p class="off">OFFICE OF THE PUNONG BARANGAY</p>
   </div>
   <div style="min-width:70px;text-align:right;font-size:9px;color:#555;">Printed:<br><strong>${todayStr}</strong></div>
 </div>
@@ -973,13 +1085,11 @@ ${resBlock}
   <div class="sum-card"><span class="num">${c.Dismissed||0}</span><span class="lbl">Dismissed</span></div>
 </div>
 <table>
-  <thead>
-    <tr>
-      <th>Ref No.</th><th>Full Name</th><th>Age</th><th>Civil Status</th>
-      <th>Address</th><th>Complaint Against</th><th>Complaint Type</th>
-      <th>Date (Petsa)</th><th>Time (Oras)</th><th>Status</th><th>Complaint Details</th>
-    </tr>
-  </thead>
+  <thead><tr>
+    <th>Ref No.</th><th>Full Name</th><th>Age</th><th>Civil Status</th>
+    <th>Address</th><th>Complaint Against</th><th>Complaint Type</th>
+    <th>Date (Petsa)</th><th>Time (Oras)</th><th>Status</th><th>Complaint Details</th>
+  </tr></thead>
   <tbody>${rows}</tbody>
 </table>
 <div class="footer">Total Records: ${records.length} &nbsp;|&nbsp; Barangay Tugtug E-System &nbsp;|&nbsp; Printed on: ${todayStr}</div>
