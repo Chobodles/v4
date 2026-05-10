@@ -1,4 +1,4 @@
-body{
+body {
     margin: 0;
     background-image: url(../photos/Background.png.png);
     background-repeat: no-repeat;
@@ -6,11 +6,12 @@ body{
     animation-delay: 1s;
     opacity: 0;
     animation: fadeIn 0.3s ease 0.1s forwards;
-    
 }
 
 @keyframes fadeIn {
-    to { opacity: 1; }
+    to {
+        opacity: 1;
+    }
 }
 
 body.fade-out {
@@ -18,7 +19,7 @@ body.fade-out {
     transition: opacity 0.5s ease;
 }
 
-.btn-back{
+.btn-back {
     position: absolute;
     left: 2vw;
     width: 9vw;
@@ -29,38 +30,37 @@ body.fade-out {
     transition: 0.1s ease-in-out 0.1s;
 }
 
-.btn-back:hover{
+.btn-back:hover {
     cursor: pointer;
     width: 8vw;
     transition: 0.1s ease-in-out 0.1s;
 }
 
-.backbutton{
+.backbutton {
     position: relative;
     top: 0.3vh;
     transition: 0.1s ease-in-out 0.1s;
 }
 
-.btn-back:hover .backbutton{
+.btn-back:hover .backbutton {
     cursor: pointer;
     width: 3vh;
     transition: 0.1s ease-in-out 0.1s;
 }
 
-.back{
+.back {
     position: relative;
     top: 0vh;
     left: 0vw;
     font-size: 3vh;
-    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-family: Cambria, Cochin, Georgia, Times, "Times New Roman", serif;
     font-weight: bold;
 }
 
-.btn-back:hover .back{
+.btn-back:hover .back {
     cursor: pointer;
     font-size: 3.2vh;
 }
-
 
 /* --- FORM CONTAINER (PAPER LOOK) --- */
 .form-container {
@@ -77,7 +77,7 @@ body.fade-out {
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: space-between; 
+    justify-content: space-between;
     width: 100%;
     margin-bottom: 10px;
 }
@@ -88,11 +88,10 @@ body.fade-out {
     flex-shrink: 0;
 }
 
-
 .header-text-group {
     flex-grow: 1;
     text-align: center;
-    margin-right: 100px; 
+    margin-right: 100px;
 }
 
 .titletop {
@@ -134,7 +133,9 @@ body.fade-out {
     gap: 20px;
 }
 
-.row .form-group { flex: 1; }
+.row .form-group {
+    flex: 1;
+}
 
 label {
     font-weight: 700;
@@ -144,10 +145,10 @@ label {
     text-transform: uppercase;
 }
 
-input[type="text"], 
-input[type="number"], 
-input[type="date"], 
-input[type="time"], 
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
 textarea {
     padding: 12px;
     border: 1px solid #d1d5db;
@@ -192,7 +193,9 @@ textarea {
     height: 40px;
 }
 
-.text-center { text-align: center; }
+.text-center {
+    text-align: center;
+}
 
 .sub-label {
     display: block;
@@ -201,9 +204,17 @@ textarea {
 }
 
 @media (max-width: 600px) {
-    .row { flex-direction: column; }
-    .form-header { flex-direction: column; gap: 10px; }
-    .form-container { padding: 25px; margin: 10px; }
+    .row {
+        flex-direction: column;
+    }
+    .form-header {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .form-container {
+        padding: 25px;
+        margin: 10px;
+    }
 }
 
 /* --- SUBMIT BUTTON STYLES --- */
@@ -215,19 +226,19 @@ textarea {
 }
 
 .submit-btn {
-    background-color: #032f15; 
+    background-color: #032f15;
     color: white;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     font-size: 1.1rem;
     font-weight: 300;
-    
+
     /* --- KEY FIXES --- */
-    padding: 12px 30px;      /* Vertical and Horizontal space inside the button */
-    min-width: 200px;        /* Ensures it's not too tiny */
-    height: auto;            /* Allows the button to wrap if text is long */
-    line-height: 1.2;        /* Keeps text lines tight */
-    display: inline-block;    /* Standard for buttons */
-    text-align: center;      /* Centers text horizontally */
+    padding: 12px 30px; /* Vertical and Horizontal space inside the button */
+    min-width: 200px; /* Ensures it's not too tiny */
+    height: auto; /* Allows the button to wrap if text is long */
+    line-height: 1.2; /* Keeps text lines tight */
+    display: inline-block; /* Standard for buttons */
+    text-align: center; /* Centers text horizontally */
     /* ----------------- */
 
     border: none;
@@ -237,7 +248,7 @@ textarea {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     text-transform: uppercase;
     letter-spacing: 1px;
-}   
+}
 
 .submit-btn:hover {
     background-color: #054d22; /* A slightly lighter green on hover */

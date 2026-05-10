@@ -1,17 +1,16 @@
-<!DOCTYPE html>
+<!doctype html>
 
 <html>
     <head>
         <title>Resident Tab | Barangay Tugtug E-System</title>
-        <meta charset="UTF-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-        <link rel="stylesheet" href="cssfile/residentchoice.css"/>
-        <link rel="icon" href="photos/logo.png.png"/>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" href="cssfile/residentchoice.css" />
+        <link rel="icon" href="photos/logo.png.png" />
     </head>
 
     <body>
-
-        <button class="btn-back" onclick="window.location.href='choice.html'">
+        <button class="btn-back" onclick="window.location.href = 'choice.html'">
             <image class="backbutton" src="photos/backbutton.png"></image>
             <label class="back">Back</label>
         </button>
@@ -19,27 +18,41 @@
         <label>Please Select Your Request</label>
 
         <header class="Container">
-
-            <section class="blotter-Container" onclick="window.location.href='blotterdemo.html'">
-                <image class="blotter-Logo" src="photos/Blotter.png" alt="Error to Load Image"></image>
+            <section
+                class="blotter-Container"
+                onclick="window.location.href = 'blotterdemo.html'"
+            >
+                <image
+                    class="blotter-Logo"
+                    src="photos/Blotter.png"
+                    alt="Error to Load Image"
+                ></image>
                 <h1 id="blotter">Blotter Request</h1>
             </section>
 
-            <section class="document-Container" onclick="window.location.href='residentform.html'">
-                <image class="document-Logo" src="photos/Document.png" alt="Error to Load Image"></image>
+            <section
+                class="document-Container"
+                onclick="window.location.href = 'residentform.php'"
+            >
+                <image
+                    class="document-Logo"
+                    src="photos/Document.png"
+                    alt="Error to Load Image"
+                ></image>
                 <h1 id="document">Document Request</h1>
             </section>
-
         </header>
 
         <section class="tracking">
-
             <section class="track-document">
                 <label class="document-track">Track your Requests Here</label>
-                <button class="track-btn track-btn-doc" onclick="window.location.href='trackresult.html'">Track</button>
+                <button
+                    class="track-btn track-btn-doc"
+                    onclick="window.location.href = 'trackresult.php'"
+                >
+                    Track
+                </button>
             </section>
-
         </section>
-
     </body>
 </html>
