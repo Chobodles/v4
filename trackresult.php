@@ -277,8 +277,8 @@ function getStatusMeta($status)
                         ); ?></span>
                     </div>
                 </div>
-
-                <div class="progress-section">
+<!--ARE YUNG NASA BABA NA PART-->
+                <!--<div class="progress-section">
                     <h4 class="progress-title">REQUEST PROGRESS</h4>
                     <div class="progress-steps">
                         <?php
@@ -322,7 +322,9 @@ function getStatusMeta($status)
                         endforeach;
                         ?>
                     </div>
-                </div>
+                </div>-->
+
+                <!--Until here-->
             </div>
         <?php
         endif; ?>

@@ -52,12 +52,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     // Generate Reference
 
-    $ref_number =
-        "BRGY-" .
-        date("Y") .
-        "-" .
-        str_pad(mt_rand(1, 99999), 4, "0", STR_PAD_LEFT);
-
+    do {
+        $ref_number =
+            "BRGY-" .
+            date("Y") .
+            "-" .
+            str_pad(mt_rand(1, 99999), 5, "0", STR_PAD_LEFT);
+        $chk = $conn->prepare(
+            "SELECT blotter_id FROM blotter WHERE reference_number = ? LIMIT 1",
+        );
+        $chk->bind_param("s", $ref_number);
+        $chk->execute();
+        $chk->store_result();
+    } while ($chk->num_rows > 0);
     // 3. Database Insertion (Matching your 'blotter' table columns)
     $sql = "INSERT INTO blotter (
         reference_number, first_name, middle_name, last_name, suffix,

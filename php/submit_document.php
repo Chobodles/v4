@@ -57,30 +57,41 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     // 5. Generate Unique Reference Number
-    $ref_number =
-        "DOC-" .
-        date("Y") .
-        "-" .
-        str_pad(mt_rand(1, 99999), 4, "0", STR_PAD_LEFT);
+    do {
+        $ref_number =
+            "DOC-" .
+            date("Y") .
+            "-" .
+            str_pad(mt_rand(1, 99999), 5, "0", STR_PAD_LEFT);
+        $chk = $conn->prepare(
+            "SELECT request_ID FROM document_request WHERE document_refnumber = ? LIMIT 1",
+        );
+        $chk->bind_param("s", $ref_number);
+        $chk->execute();
+        $chk->store_result();
+    } while ($chk->num_rows > 0);
 
     // 6. Resident Logic: Check/Insert resident
+    $mi = !empty($middle_name) ? strtoupper(substr($middle_name, 0, 1)) : "";
+    $sex_mapped = $gender === "Male" ? "M" : "F";
+
     $check_res = $conn->prepare(
-        "SELECT resident_ID FROM resident_information WHERE first_name = ? AND last_name = ? AND birthdate = ? LIMIT 1",
+        "SELECT resident_ID FROM resident_information
+         WHERE first_name = ? AND last_name = ? AND birthdate = ? AND middle_initial = ? LIMIT 1",
     );
-    $check_res->bind_param("sss", $first_name, $last_name, $birthday);
+    $check_res->bind_param("ssss", $first_name, $last_name, $birthday, $mi);
     $check_res->execute();
     $res_result = $check_res->get_result();
 
     if ($row = $res_result->fetch_assoc()) {
+        // Resident already exists — reuse their ID
         $resident_id = $row["resident_ID"];
     } else {
-        $mi = !empty($middle_name)
-            ? strtoupper(substr($middle_name, 0, 1))
-            : "";
-        $sex_mapped = $gender === "Male" ? "M" : "F";
-
+        // New resident — insert
         $ins_res = $conn->prepare(
-            "INSERT INTO resident_information (first_name, last_name, middle_initial, suffix, sex, birthdate, birthplace) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO resident_information
+             (first_name, last_name, middle_initial, suffix, sex, birthdate, birthplace)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
         );
         $ins_res->bind_param(
             "sssssss",
@@ -95,7 +106,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $ins_res->execute();
         $resident_id = $conn->insert_id;
     }
-
     // 7. Insert Document Request
     $sql = "INSERT INTO document_request (
                 document_refnumber,
