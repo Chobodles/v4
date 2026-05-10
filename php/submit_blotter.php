@@ -1,108 +1,106 @@
 <?php
-// ============================================================
-//  Barangay Tugtug E-System — Submit Blotter Report
-//  File: php/submit_blotter.php
-//  Updated to match db-barangay-system schema (no blotter_details,
-//  no blotter_reference_number; uses separate name columns)
-// ============================================================
-header("Content-Type: application/json");
-ini_set("display_errors", 0);
-ini_set("log_errors", 1);
-error_reporting(E_ALL);
+$servername = "localhost";
+$username = "root";
+$password = "";
+$database = "db-barangay-system";
 
-define("DB_HOST",    "localhost");
-define("DB_NAME",    "db-barangay-system");
-define("DB_USER",    "root");
-define("DB_PASS",    "");
-define("DB_CHARSET", "utf8mb4");
+$conn = mysqli_connect($servername, $username, $password, $database);
 
-$dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
-$opt = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => true,
-];
-
-try {
-    $pdo = new PDO($dsn, DB_USER, DB_PASS, $opt);
-} catch (PDOException $e) {
-    error_log("DB error: " . $e->getMessage());
-    echo json_encode(["success" => false, "message" => "Database connection error."]);
-    exit();
+if (!$conn) {
+    die("Connection failed: " . mysqli_connect_error());
 }
 
-if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    http_response_code(405);
-    echo json_encode(["success" => false, "message" => "Method not allowed."]);
-    exit();
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // Inputs
+    $first_name = trim($_POST["first_name"]);
+    $last_name = trim($_POST["last_name"]);
+    $middle_name = trim($_POST["middle_name"]);
+    $suffix = $_POST["suffix"];
+    $age = intval($_POST["age"]);
+    $civil_status = $_POST["civil_status"];
+    $address = trim($_POST["address"]);
+    $occupation = trim($_POST["occupation"]);
+    $incident_date = $_POST["incident_date"];
+    $incident_time = $_POST["incident_time"];
+    $complaint_against = trim($_POST["complaint_against"]);
+    $complaint_type = $_POST["complaint_type"];
+    $complaint_details = trim($_POST["complaint_details"]);
+
+    // 1. Validation: No numbers in names
+    if (
+        preg_match("/[0-9]/", $first_name) ||
+        preg_match("/[0-9]/", $last_name)
+    ) {
+        header("Location: ../blotterdemo.html?error=name_numbers");
+        exit();
+    }
+
+    // 2. File Upload Handling
+    $target_dir = "uploads/";
+    if (!is_dir($target_dir)) {
+        mkdir($target_dir, 0777, true);
+    }
+
+    $file_ext = pathinfo($_FILES["id_image"]["name"], PATHINFO_EXTENSION);
+    $new_filename = "ID_" . time() . "_" . $last_name . "." . $file_ext;
+    $id_image_path = $target_dir . $new_filename;
+
+    if (!move_uploaded_file($_FILES["id_image"]["tmp_name"], $id_image_path)) {
+        header("Location: ../blotterdemo.html?error=upload_fail");
+        exit();
+    }
+
+    // Generate Reference
+
+    $ref_number =
+        "BRGY-" .
+        date("Y") .
+        "-" .
+        str_pad(mt_rand(1, 99999), 4, "0", STR_PAD_LEFT);
+
+    // 3. Database Insertion (Matching your 'blotter' table columns)
+    $sql = "INSERT INTO blotter (
+        reference_number, first_name, middle_name, last_name, suffix,
+        age, civil_status, address, occupation,
+        petsa, oras, complaint_against, complaint_type, complaint_details,
+        id_image_path, status, submitted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())";
+
+    $stmt = mysqli_prepare($conn, $sql);
+
+    if ($stmt) {
+        // "sssssisssssssss" = 15 placeholders
+        mysqli_stmt_bind_param(
+            $stmt,
+            "sssssisssssssss",
+            $ref_number,
+            $first_name,
+            $middle_name,
+            $last_name,
+            $suffix,
+            $age,
+            $civil_status,
+            $address,
+            $occupation,
+            $incident_date,
+            $incident_time,
+            $complaint_against,
+            $complaint_type,
+            $complaint_details,
+            $id_image_path,
+        );
+
+        if (mysqli_stmt_execute($stmt)) {
+            header("Location: ../blotterthankyou.html?ref=" . $ref_number);
+            exit();
+        } else {
+            header("Location: ../blotterdemo.html?error=db_fail");
+            exit();
+        }
+    } else {
+        header("Location: ../blotterdemo.html?error=prepare_fail");
+        exit();
+    }
 }
-
-$body = file_get_contents("php://input");
-$data = json_decode($body, true);
-
-if (!$data) {
-    echo json_encode(["success" => false, "message" => "Invalid JSON data received."]);
-    exit();
-}
-
-// ── Generate unique reference number ─────────────────────────
-// New schema uses reference_number directly on blotter table;
-// no separate blotter_reference_number table exists.
-$year    = date("Y");
-$ref_num = "";
-do {
-    $random  = str_pad(mt_rand(10000, 99999), 5, "0", STR_PAD_LEFT);
-    $ref_num = "BRGY-" . $year . "-" . $random;
-    $check   = $pdo->prepare(
-        "SELECT COUNT(*) FROM blotter WHERE reference_number = :ref"
-    );
-    $check->execute([":ref" => $ref_num]);
-    $exists = $check->fetchColumn();
-} while ($exists > 0);
-
-try {
-    $stmt = $pdo->prepare(
-        "INSERT INTO blotter
-            (reference_number, first_name, middle_name, last_name, suffix,
-             age, civil_status, address, occupation,
-             petsa, oras, complaint_against, complaint_type, complaint_details,
-             status, submitted_at)
-         VALUES
-            (:ref, :first_name, :middle_name, :last_name, :suffix,
-             :age, :civil, :address, :occupation,
-             :petsa, :oras, :against, :type, :details,
-             'Pending', NOW())"
-    );
-    $stmt->execute([
-        ":ref"         => $ref_num,
-        ":first_name"  => trim($data["first_name"]       ?? ""),
-        ":middle_name" => trim($data["middle_name"]      ?? "") ?: null,
-        ":last_name"   => trim($data["last_name"]        ?? ""),
-        ":suffix"      => trim($data["suffix"]           ?? "") ?: null,
-        ":age"         => intval($data["age"]            ?? 0),
-        ":civil"       => trim($data["civil_status"]     ?? ""),
-        ":address"     => trim($data["address"]          ?? ""),
-        ":occupation"  => trim($data["occupation"]       ?? ""),
-        ":petsa"       => $data["petsa"]                 ?? null,
-        ":oras"        => $data["oras"]                  ?? null,
-        ":against"     => trim($data["complaint_against"] ?? ""),
-        ":type"        => trim($data["complaint_type"]   ?? ""),
-        ":details"     => trim($data["complaint_details"] ?? ""),
-    ]);
-    $blotterId = $pdo->lastInsertId();
-
-    echo json_encode([
-        "success"          => true,
-        "reference_number" => $ref_num,
-        "blotter_id"       => $blotterId,
-    ]);
-
-} catch (PDOException $e) {
-    error_log("Insert error: " . $e->getMessage());
-    echo json_encode([
-        "success" => false,
-        "message" => "Failed to save blotter: " . $e->getMessage(),
-    ]);
-}
-exit();
+mysqli_close($conn);
 ?>
