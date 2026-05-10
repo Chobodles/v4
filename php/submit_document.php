@@ -29,7 +29,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     // 3. ID Image Upload Handling
-    $target_dir = "../uploads/ids/";
+    $target_dir = "uploadsdoc/";
     if (!is_dir($target_dir)) {
         mkdir($target_dir, 0777, true);
     }
@@ -37,7 +37,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $file_extension = pathinfo($_FILES["id_image"]["name"], PATHINFO_EXTENSION);
     $new_filename = "ID_" . time() . "_" . $last_name . "." . $file_extension;
     $target_file = $target_dir . $new_filename;
-    $db_save_path = "uploads/ids/" . $new_filename;
+    $db_save_path = "uploadsdoc/" . $new_filename;
 
     if (!move_uploaded_file($_FILES["id_image"]["tmp_name"], $target_file)) {
         header("Location: ../residentform.php?error=upload_fail");

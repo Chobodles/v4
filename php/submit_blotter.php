@@ -36,7 +36,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     // 2. File Upload Handling
-    $target_dir = "uploads/";
+    $target_dir = "uploadsblot/";
     if (!is_dir($target_dir)) {
         mkdir($target_dir, 0777, true);
     }

@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (e.target && e.target.id === "btn-apply-date") fetchRecords();
   });
 
-  // ── Status colors (including Released) ───────────────────
+  // ── Status colors ─────────────────────────────────────────
   const statusColors = {
     Pending: { bg: "#fff3cd", color: "#856404", border: "#ffc107" },
     Processing: { bg: "#cfe2ff", color: "#084298", border: "#0d6efd" },
@@ -298,7 +298,7 @@ document.addEventListener("DOMContentLoaded", function () {
         .modal-select { width:100%;padding:1vh 1vw;border-radius:8px;border:1.5px solid #7d9e3b;
             font-size:1.7vh;background:white;color:#273b07;margin-bottom:2.5vh;cursor:pointer;outline:none; }
         .modal-select:focus { border-color:#375309; }
-        .modal-buttons { display:flex;gap:1vw;justify-content:flex-end; }
+        .modal-buttons { display:flex;gap:0.7vw;justify-content:flex-end;flex-wrap:wrap;align-items:center; }
         .modal-btn-cancel { background:transparent;border:2px solid #375309;color:#375309;
             padding:0.8vh 1.5vw;border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s; }
         .modal-btn-cancel:hover { background:#375309;color:white; }
@@ -306,6 +306,22 @@ document.addEventListener("DOMContentLoaded", function () {
             border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s; }
         .modal-btn-save:hover { background:#7d9e3b; }
         .modal-resident { font-size:1.5vh;color:#555;margin-bottom:2vh; }
+
+        /* ── NEW: Delete & View Image buttons ── */
+        .modal-btn-delete {
+            background:#c0392b;border:none;color:#fff;padding:0.8vh 1.5vw;
+            border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
+            margin-right:auto;
+        }
+        .modal-btn-delete:hover { background:#e74c3c; }
+        .modal-btn-viewimg {
+            background:#1565c0;border:none;color:#fff;padding:0.8vh 1.5vw;
+            border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
+        }
+        .modal-btn-viewimg:hover { background:#1976d2; }
+        .modal-btn-viewimg:disabled {
+            background:#90a4ae;cursor:not-allowed;opacity:0.7;
+        }
 
         /* Released lock banner */
         .locked-banner {
@@ -315,6 +331,50 @@ document.addEventListener("DOMContentLoaded", function () {
         .locked-banner-icon { font-size:2.2vh;flex-shrink:0;margin-top:0.1vh; }
         .locked-banner-text { font-size:1.4vh;color:#4a235a;line-height:1.6; }
         .locked-banner-text strong { font-size:1.5vh; }
+
+        /* Delete confirmation */
+        .delete-overlay {
+            position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:11000;
+            display:flex;align-items:center;justify-content:center;animation:fadeIn 0.15s ease;
+        }
+        .delete-box {
+            background:#fff;border-radius:15px;padding:3vh 2.5vw;width:30vw;min-width:280px;
+            box-shadow:0 12px 50px rgba(0,0,0,0.5);font-family:'Segoe UI',Tahoma,sans-serif;text-align:center;
+        }
+        .delete-icon  { font-size:5vh;margin-bottom:1.5vh; }
+        .delete-title { font-size:2vh;font-weight:700;color:#c0392b;margin-bottom:1vh; }
+        .delete-msg   { font-size:1.45vh;color:#555;margin-bottom:1.5vh;line-height:1.6; }
+        .delete-warning {
+            background:#fff5f5;border:1.5px solid #e74c3c;border-radius:8px;
+            padding:1vh 1vw;font-size:1.3vh;color:#c0392b;margin:0 0 2vh;text-align:left;line-height:1.6;
+        }
+        .delete-buttons { display:flex;gap:1vw;justify-content:center; }
+        .delete-btn-no {
+            background:transparent;border:2px solid #273b07;color:#273b07;
+            padding:0.8vh 2vw;border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
+        }
+        .delete-btn-no:hover  { background:#273b07;color:#f3efe8;transform:translateY(-2px); }
+        .delete-btn-yes {
+            background:#c0392b;border:none;color:#fff;
+            padding:0.8vh 2vw;border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
+        }
+        .delete-btn-yes:hover { background:#e74c3c;transform:translateY(-2px); }
+
+        /* Image lightbox */
+        .img-overlay {
+            position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:12000;
+            display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;
+            flex-direction:column;gap:2vh;
+        }
+        .img-overlay img {
+            max-width:85vw;max-height:80vh;border-radius:10px;
+            box-shadow:0 8px 40px rgba(0,0,0,0.6);object-fit:contain;
+        }
+        .img-close-btn {
+            background:#f3efe8;color:#273b07;border:none;border-radius:8px;
+            padding:1vh 2.5vw;font-size:1.7vh;font-weight:700;cursor:pointer;transition:0.2s;
+        }
+        .img-close-btn:hover { background:#fff;transform:translateY(-2px); }
 
         /* Confirmation modal */
         .confirm-overlay {
@@ -326,9 +386,9 @@ document.addEventListener("DOMContentLoaded", function () {
             box-shadow:0 12px 50px rgba(0,0,0,0.4);font-family:'Segoe UI',Tahoma,sans-serif;
             text-align:center;
         }
-        .confirm-icon { font-size:4.5vh;margin-bottom:1.5vh; }
+        .confirm-icon  { font-size:4.5vh;margin-bottom:1.5vh; }
         .confirm-title { font-size:2vh;font-weight:700;color:#273b07;margin-bottom:1vh; }
-        .confirm-msg { font-size:1.5vh;color:#555;margin-bottom:0.8vh;line-height:1.6; }
+        .confirm-msg   { font-size:1.5vh;color:#555;margin-bottom:0.8vh;line-height:1.6; }
         .confirm-note {
             background:#fff8e6;border:1.5px solid #ffc107;border-radius:8px;
             padding:1vh 1vw;font-size:1.35vh;color:#856404;margin:1.5vh 0 2vh;
@@ -340,21 +400,13 @@ document.addEventListener("DOMContentLoaded", function () {
             background:transparent;border:2px solid #273b07;color:#273b07;
             padding:0.8vh 2vw;border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
         }
-        .confirm-btn-no:hover { background:#273b07;color:#f3efe8; transform: translateY(-10%);}
+        .confirm-btn-no:hover  { background:#273b07;color:#f3efe8;transform:translateY(-10%); }
         .confirm-btn-yes {
             background:#273b07;border:none;color:#f3efe8;
             padding:0.8vh 2vw;border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
         }
-        .confirm-btn-yes:hover { background:#7d9e3b; transform: translateY(-10%);}
+        .confirm-btn-yes:hover { background:#7d9e3b;transform:translateY(-10%); }
 
-        /* Delete confirm button — red */
-        .confirm-btn-delete {
-            background:#c62828;border:none;color:#fff;
-            padding:0.8vh 2vw;border-radius:8px;font-size:1.6vh;font-weight:600;cursor:pointer;transition:0.2s;
-        }
-        .confirm-btn-delete:hover { background:#e53935;transform:translateY(-10%); }
-
-        /* Locked fields */
         .status-locked-note {
             font-size:1.35vh;color:#6c3483;font-style:italic;margin-top:-1.5vh;margin-bottom:2vh;
             display:flex;align-items:center;gap:0.4vw;
@@ -365,35 +417,6 @@ document.addEventListener("DOMContentLoaded", function () {
             z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3);animation:slideUp 0.3s ease; }
         @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
         @keyframes fadeIn  { from{opacity:0} to{opacity:1} }
-
-        /* Image viewer overlay */
-        .img-viewer-overlay {
-            position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:19999;
-            display:flex;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;
-        }
-        .img-viewer-box {
-            background:#1a1a1a;border-radius:12px;padding:2vh 2vw;
-            max-width:80vw;max-height:90vh;display:flex;flex-direction:column;
-            align-items:center;gap:1.5vh;box-shadow:0 20px 60px rgba(0,0,0,0.8);
-        }
-        .img-viewer-title {
-            color:#f3efe8;font-family:'Segoe UI',sans-serif;font-size:1.6vh;font-weight:700;
-            align-self:flex-start;opacity:0.8;
-        }
-        .img-viewer-img {
-            max-width:70vw;max-height:75vh;border-radius:8px;object-fit:contain;
-            box-shadow:0 4px 20px rgba(0,0,0,0.5);
-        }
-        .img-viewer-close {
-            background:#cc0000;color:white;border:none;border-radius:8px;
-            padding:0.8vh 2vw;font-size:1.5vh;font-weight:700;cursor:pointer;
-            transition:background 0.2s;align-self:flex-end;
-        }
-        .img-viewer-close:hover { background:#ff3333; }
-        .img-viewer-none {
-            color:#aaa;font-size:1.6vh;font-family:'Segoe UI',sans-serif;
-            padding:4vh 2vw;text-align:center;
-        }
     `;
   document.head.appendChild(style);
 
@@ -452,7 +475,7 @@ document.addEventListener("DOMContentLoaded", function () {
         </div>`
       : "";
 
-    // ── Determine if there's an image to show ─────────────────
+    // View Image button — enabled only if id_image_path exists
     const hasImage = rec.id_image_path && rec.id_image_path.trim() !== "";
 
     const overlay = document.createElement("div");
@@ -460,39 +483,7 @@ document.addEventListener("DOMContentLoaded", function () {
     overlay.id = "update-modal";
     overlay.innerHTML = `
             <div class="modal-box" style="width:38vw;min-width:320px;max-height:85vh;overflow-y:auto;">
-
-                <!-- Modal Title Row with Action Buttons -->
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2vh;gap:0.6vw;flex-wrap:wrap;">
-                    <div class="modal-title" style="margin-bottom:0;">Request Details #${rec.request_ID}</div>
-                    <div style="display:flex;gap:0.5vw;flex-wrap:wrap;">
-
-                        <!-- View Image Button -->
-                        <button onclick="viewDocumentImage('${(rec.id_image_path || "").replace(/'/g, "\\'")}')"
-                            title="View uploaded ID image"
-                            style="background:${hasImage ? "#1565c0" : "#9e9e9e"};color:#fff;border:none;border-radius:7px;
-                                padding:0.5vh 0.9vw;font-size:1.3vh;font-weight:700;
-                                cursor:${hasImage ? "pointer" : "not-allowed"};
-                                display:flex;align-items:center;gap:0.4vw;transition:0.2s;
-                                opacity:${hasImage ? "1" : "0.6"};white-space:nowrap;"
-                            onmouseover="if(${hasImage}) this.style.background='#1e88e5'"
-                            onmouseout="if(${hasImage}) this.style.background='${hasImage ? "#1565c0" : "#9e9e9e"}'"
-                            ${hasImage ? "" : "disabled"}>
-                            🖼️ View Image
-                        </button>
-
-                        <!-- Delete Button -->
-                        <button onclick="confirmDeleteDocument(${rec.request_ID}, '${rec.document_refnumber}')"
-                            title="Permanently delete this request"
-                            style="background:#c62828;color:#fff;border:none;border-radius:7px;
-                                padding:0.5vh 0.9vw;font-size:1.3vh;font-weight:700;cursor:pointer;
-                                display:flex;align-items:center;gap:0.4vw;transition:0.2s;white-space:nowrap;"
-                            onmouseover="this.style.background='#e53935'"
-                            onmouseout="this.style.background='#c62828'">
-                            🗑️ Delete
-                        </button>
-
-                    </div>
-                </div>
+                <div class="modal-title">Request Details #${rec.request_ID}</div>
 
                 ${lockBanner}
 
@@ -564,7 +555,22 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                 </div>
 
+                <!-- ACTION BUTTONS -->
                 <div class="modal-buttons">
+                    <!-- Delete on the far left -->
+                    <button class="modal-btn-delete"
+                        onclick="confirmDeleteDocument(${rec.request_ID}, '${(rec.document_refnumber || "").replace(/'/g, "\\'")}')">
+                        🗑️ Delete
+                    </button>
+
+                    <!-- View Image -->
+                    <button class="modal-btn-viewimg"
+                        ${!hasImage ? "disabled title='No ID image on file'" : `onclick="viewDocumentImage('${(rec.id_image_path || "").replace(/'/g, "\\'")}')"`}
+                    >
+                        🖼️ View ID Image
+                    </button>
+
+                    <!-- Cancel & Save -->
                     <button class="modal-btn-cancel" onclick="document.getElementById('update-modal').remove()">Cancel</button>
                     <button class="modal-btn-save" id="modal-save-btn" onclick="saveStatus(${rec.request_ID})">
                         Save Changes
@@ -616,102 +622,114 @@ document.addEventListener("DOMContentLoaded", function () {
     };
   }
 
-  // ── View Image ────────────────────────────────────────────
+  // ── View ID Image lightbox ────────────────────────────────
   window.viewDocumentImage = function (imagePath) {
-    if (!imagePath || imagePath.trim() === "") {
-      showToast("⚠️ No image available for this record.");
-      return;
-    }
-
-    const existing = document.getElementById("img-viewer-modal");
+    const existing = document.getElementById("img-lightbox");
     if (existing) existing.remove();
 
-    const viewerOverlay = document.createElement("div");
-    viewerOverlay.className = "img-viewer-overlay";
-    viewerOverlay.id = "img-viewer-modal";
-    viewerOverlay.innerHTML = `
-      <div class="img-viewer-box">
-        <div class="img-viewer-title">📎 Uploaded ID — ${imagePath.split("/").pop()}</div>
-        <img class="img-viewer-img"
-          src="${imagePath}"
-          alt="ID Image"
-          onerror="this.style.display='none';document.getElementById('img-load-err').style.display='block'">
-        <div id="img-load-err" class="img-viewer-none" style="display:none;">
-          ⚠️ Image could not be loaded.<br>
-          <small style="opacity:0.7;">${imagePath}</small>
-        </div>
-        <button class="img-viewer-close" onclick="document.getElementById('img-viewer-modal').remove()">
-          ✕ Close
-        </button>
-      </div>`;
+    const lightbox = document.createElement("div");
+    lightbox.className = "img-overlay";
+    lightbox.id = "img-lightbox";
 
-    viewerOverlay.addEventListener("click", (e) => {
-      if (e.target === viewerOverlay) viewerOverlay.remove();
+    // Build image URL — handle relative paths from PHP uploads folder
+    // const imgSrc = imagePath.startsWith("http") ? imagePath : ("php/" + imagePath).replace("php/php/", "php/");
+
+    const imgSrc = imagePath.startsWith("http")
+      ? imagePath
+      : "php/uploadsdoc/" + imagePath.split("/").pop();
+
+    lightbox.innerHTML = `
+      <div style="text-align:center;">
+        <p style="color:#f3efe8;font-size:1.4vh;font-family:'Segoe UI',sans-serif;margin:0 0 1.5vh;
+          opacity:0.75;letter-spacing:0.5px;">🪪 Submitted ID Image</p>
+        <img src="${imgSrc}"
+          onerror="this.style.display='none';document.getElementById('img-err').style.display='block';"
+          alt="ID Image" />
+        <div id="img-err" style="display:none;color:#f3efe8;font-size:1.6vh;
+          font-family:'Segoe UI',sans-serif;padding:3vh 4vw;
+          background:rgba(255,255,255,0.08);border-radius:10px;margin-top:1vh;">
+          ⚠️ Image could not be loaded.<br>
+          <span style="font-size:1.3vh;opacity:0.7;">Path: ${imagePath}</span>
+        </div>
+      </div>
+      <button class="img-close-btn" onclick="document.getElementById('img-lightbox').remove()">
+        ✕ Close
+      </button>`;
+
+    lightbox.addEventListener("click", (e) => {
+      if (e.target === lightbox) lightbox.remove();
     });
-    document.body.appendChild(viewerOverlay);
+    document.body.appendChild(lightbox);
   };
 
-  // ── Delete confirmation ───────────────────────────────────
+  // ── Delete document confirmation ──────────────────────────
   window.confirmDeleteDocument = function (requestId, refNumber) {
-    const existing = document.getElementById("confirm-modal");
+    const existing = document.getElementById("delete-modal");
     if (existing) existing.remove();
 
-    const confirmOverlay = document.createElement("div");
-    confirmOverlay.className = "confirm-overlay";
-    confirmOverlay.id = "confirm-modal";
-    confirmOverlay.innerHTML = `
-      <div class="confirm-box">
-        <div style="font-size:4.5vh;margin-bottom:1.5vh;">🗑️</div>
-        <div class="confirm-title" style="color:#c62828;">Delete Document Request?</div>
-        <div class="confirm-msg">
-          Are you sure you want to permanently delete<br>
-          <strong>${refNumber}</strong>?
+    const deleteOverlay = document.createElement("div");
+    deleteOverlay.className = "delete-overlay";
+    deleteOverlay.id = "delete-modal";
+    deleteOverlay.innerHTML = `
+      <div class="delete-box">
+        <div class="delete-icon">🗑️</div>
+        <div class="delete-title">Delete Document Request?</div>
+        <div class="delete-msg">
+          You are about to permanently delete request<br>
+          <strong style="font-family:'Courier New',monospace;letter-spacing:1px;">${refNumber}</strong>
         </div>
-        <div class="confirm-note" style="background:#fff5f5;border-color:#f1aeb5;color:#842029;">
-          <strong>⚠️ This action cannot be undone.</strong><br>
-          The document request and all its associated data will be permanently removed from the system.
+        <div class="delete-warning">
+          ⚠️ <strong>This action cannot be undone.</strong><br>
+          All data associated with this request, including the uploaded ID image reference, will be permanently removed from the system.
         </div>
-        <div class="confirm-buttons">
-          <button class="confirm-btn-no" onclick="document.getElementById('confirm-modal').remove()">
+        <div class="delete-buttons">
+          <button class="delete-btn-no" onclick="document.getElementById('delete-modal').remove()">
             No, Keep It
           </button>
-          <button class="confirm-btn-delete" onclick="doDeleteDocument(${requestId})">
+          <button class="delete-btn-yes" onclick="executeDeleteDocument(${requestId})">
             🗑️ Yes, Delete
           </button>
         </div>
       </div>`;
 
-    document.body.appendChild(confirmOverlay);
+    document.body.appendChild(deleteOverlay);
   };
 
-  window.doDeleteDocument = function (requestId) {
-    const confirmModal = document.getElementById("confirm-modal");
-    if (confirmModal) confirmModal.remove();
+  window.executeDeleteDocument = function (requestId) {
+    const deleteModal = document.getElementById("delete-modal");
+    const updateModal = document.getElementById("update-modal");
+    const yesBtn = deleteModal
+      ? deleteModal.querySelector(".delete-btn-yes")
+      : null;
 
-    fetch("php/GetDocuments.php", {
+    if (yesBtn) {
+      yesBtn.textContent = "Deleting…";
+      yesBtn.disabled = true;
+    }
+
+    fetch("php/DeleteDocument.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ request_ID: requestId, action: "delete" }),
+      body: JSON.stringify({ request_ID: requestId }),
     })
       .then((res) => res.json())
       .then((data) => {
-        const modal = document.getElementById("update-modal");
-        if (modal) modal.remove();
-        showToast(
-          data.success
-            ? "🗑️ Document request deleted successfully."
-            : "❌ " + (data.message || "Delete failed."),
-        );
-        if (data.success) fetchRecords();
+        if (deleteModal) deleteModal.remove();
+        if (updateModal) updateModal.remove();
+        if (data.success) {
+          showToast("🗑️ Document request deleted successfully.");
+          fetchRecords();
+        } else {
+          showToast("❌ " + (data.message || "Delete failed."));
+        }
       })
       .catch(() => {
-        const modal = document.getElementById("update-modal");
-        if (modal) modal.remove();
+        if (deleteModal) deleteModal.remove();
         showToast("❌ Server error. Please try again.");
       });
   };
 
-  // ── Save status (with confirmation if setting to Released) ─
+  // ── Save status ───────────────────────────────────────────
   window.saveStatus = function (requestId) {
     const selectEl = document.getElementById("modal-status-select");
     const newStatus = selectEl.value;
