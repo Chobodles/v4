@@ -168,45 +168,99 @@
 
     <script>
         window.onload = function() {
-          const bdayInput = document.getElementById('birthday');
-              const ageInput = document.getElementById('age');
 
-              bdayInput.onchange = function() {
-                  if (this.value) {
-                      const birthDate = new Date(this.value);
-                      const today = new Date();
+            const bdayInput       = document.getElementById('birthday');
+            const ageInput        = document.getElementById('age');
+            const stayYearsInput  = document.querySelector('[name="stay_years"]');
+            const stayMonthsInput = document.querySelector('[name="stay_months"]');
 
-                      let age = today.getFullYear() - birthDate.getFullYear();
-                      const monthDiff = today.getMonth() - birthDate.getMonth();
+            // ── Auto-calculate age from birthday ──────────────────
+            function calculateAge() {
+                if (!bdayInput.value) return;
 
-                      // Adjust age if birthday hasn't occurred yet this year
-                      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-                          age--;
-                      }
+                const birthDate = new Date(bdayInput.value);
+                const today     = new Date();
 
-                      // Update the readonly field
-                      ageInput.value = age >= 0 ? age : 0;
-                  }
-              };
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const monthDiff = today.getMonth() - birthDate.getMonth();
 
-            // 3. Image Upload & Clear Logic
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+
+                ageInput.value = age >= 0 ? age : 0;
+                validateStay(); // re-validate stay whenever age changes
+            }
+
+            bdayInput.addEventListener("change", calculateAge);
+
+            // ── Length of stay validation ─────────────────────────
+            function validateStay() {
+                const age        = parseInt(ageInput.value) || 0;
+                const stayYears  = parseInt(stayYearsInput.value) || 0;
+                const stayMonths = parseInt(stayMonthsInput.value) || 0;
+
+                if (age === 0) return true; // age not set yet, skip
+
+                const ageInMonths  = age * 12;
+                const stayInMonths = (stayYears * 12) + stayMonths;
+
+                if (stayInMonths > ageInMonths) {
+                    stayYearsInput.style.border  = "1.5px solid #dc2626";
+                    stayMonthsInput.style.border = "1.5px solid #dc2626";
+                    return false;
+                }
+
+                // Clear error state
+                stayYearsInput.style.border  = "1px solid #d1d5db";
+                stayMonthsInput.style.border = "1px solid #d1d5db";
+
+                const errMsg = document.getElementById('stay-error-msg');
+                if (errMsg) errMsg.style.display = 'none';
+
+                return true;
+            }
+
+            stayYearsInput.addEventListener("input", validateStay);
+            stayMonthsInput.addEventListener("input", validateStay);
+
+            // ── Block submit if stay > age ────────────────────────
+            document.getElementById('personal-info-form').addEventListener('submit', function(e) {
+                if (!validateStay()) {
+                    e.preventDefault();
+
+                    let errMsg = document.getElementById('stay-error-msg');
+                    if (!errMsg) {
+                        errMsg = document.createElement('p');
+                        errMsg.id = 'stay-error-msg';
+                        errMsg.style.cssText = `
+                            color:#dc2626;font-size:0.82rem;font-weight:600;
+                            margin-top:6px;font-family:'Segoe UI',sans-serif;
+                        `;
+                        errMsg.textContent = '⚠️ Length of stay cannot exceed your age.';
+                        stayMonthsInput.closest('.form-group').after(errMsg);
+                    }
+
+                    errMsg.style.display = 'block';
+                    stayYearsInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+
+            // ── Image upload & clear ──────────────────────────────
             const fileInput = document.getElementById('id_image');
-            const clearBtn = document.getElementById('clear-file');
+            const clearBtn  = document.getElementById('clear-file');
 
             fileInput.onchange = function() {
-                if (this.files && this.files.length > 0) {
-                    clearBtn.style.display = 'inline-block';
-                } else {
-                    clearBtn.style.display = 'none';
-                }
+                clearBtn.style.display = this.files && this.files.length > 0
+                    ? 'inline-block' : 'none';
             };
 
             clearBtn.onclick = function() {
-                fileInput.value = ""; // Clears the file
-                this.style.display = 'none'; // Hides the button
+                fileInput.value = "";
+                this.style.display = 'none';
             };
 
-            // 4. Catch error parameters from URL (Redirect handling)
+            // ── URL error handling ────────────────────────────────
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('error') === 'name_numbers') {
                 alert("Names cannot contain numbers.");
@@ -215,11 +269,10 @@
             } else if (urlParams.get('error') === 'db_fail') {
                 alert("Database error. Please contact the administrator.");
             }
-
-            // Clear URL parameters after showing alert
             if (urlParams.has('error')) {
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
+
         };
     </script>
 </body>
