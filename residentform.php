@@ -192,7 +192,43 @@
                 validateStay(); // re-validate stay whenever age changes
             }
 
-            bdayInput.addEventListener("change", calculateAge);
+            // ── Prevent future birthday selection ─────────────────
+                        const today = new Date();
+                        const yyyy  = today.getFullYear();
+                        const mm    = String(today.getMonth() + 1).padStart(2, "0");
+                        const dd    = String(today.getDate()).padStart(2, "0");
+                        const todayStr = `${yyyy}-${mm}-${dd}`;
+
+                        bdayInput.setAttribute("max", todayStr);
+
+                        bdayInput.addEventListener("change", function() {
+                            if (bdayInput.value > todayStr) {
+                                bdayInput.value = "";
+                                bdayInput.style.border = "1.5px solid #dc2626";
+
+                                let bdayErr = document.getElementById('bday-error-msg');
+                                if (!bdayErr) {
+                                    bdayErr = document.createElement('p');
+                                    bdayErr.id = 'bday-error-msg';
+                                    bdayErr.style.cssText = `
+                                        color:#dc2626;font-size:0.82rem;font-weight:600;
+                                        margin-top:6px;font-family:'Segoe UI',sans-serif;
+                                    `;
+                                    bdayErr.textContent = '⚠️ Birthday cannot be a future date.';
+                                    bdayInput.closest('.form-group').appendChild(bdayErr);
+                                }
+                                bdayErr.style.display = 'block';
+                                ageInput.value = "";
+                                return;
+                            }
+
+                            // Clear error if valid
+                            bdayInput.style.border = "1px solid #d1d5db";
+                            const bdayErr = document.getElementById('bday-error-msg');
+                            if (bdayErr) bdayErr.style.display = 'none';
+
+                            calculateAge();
+                        });
 
             // ── Length of stay validation ─────────────────────────
             function validateStay() {
