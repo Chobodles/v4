@@ -1,70 +1,44 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Submission Successful | Barangay Tugtug E-System</title>
-    <link rel="icon" href="photos/logo.png.png"/>
-    <link rel="stylesheet" href="cssfile/blotterthankyou.css"/>
-</head>
-<body>
-    <div class="thank-you-container">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Submission Successful | Barangay Tugtug</title>
+        <link rel="stylesheet" href="cssfile/blotterthankyou.css" />
+    </head>
+    <body>
+        <div class="thank-you-container">
+            <div class="success-icon">✔️</div>
+            <h1>THANK YOU!</h1>
+            <p>Your information has been successfully recorded.</p>
 
-        <div class="success-icon">✔️</div>
+            <div class="ref-box">
+                <span class="ref-label">REFERENCE NUMBER</span>
+                <h2 id="ref-number">LOADING...</h2>
+            </div>
 
-        <h1>THANK YOU!</h1>
-        <p class="sub-message">Your blotter information has been successfully recorded in our system.</p>
-
-        <div class="ref-box">
-            <span class="ref-label">REFERENCE NUMBER</span>
-            <h2 id="ref-number">LOADING...</h2>
+            <div class="form-actions">
+                <button
+                    onclick="window.location.href = 'residentchoice.html'"
+                    class="home-btn"
+                >
+                    Back to Home
+                </button>
+            </div>
         </div>
 
-        <div class="instructions">
-            <h3>WHAT TO DO NEXT?</h3>
-            <ul>
-                <li><strong>Save:</strong> Take a screenshot or write down your Reference Number.</li>
-                <li><strong>Visit:</strong> Proceed to the Barangay Hall (Office of the Punong Barangay).</li>
-                <li><strong>Confirm:</strong> Present the Reference Number to the <strong>Kagawad on Duty</strong> for final signature and verification.</li>
-                <li><strong>Track:</strong> Use your reference number on the resident page to check your request status.</li>
-            </ul>
-        </div>
+        <script>
+            window.onload = function () {
+                const urlParams = new URLSearchParams(window.location.search);
+                const refNum = urlParams.get("ref");
 
-        <div class="form-actions">
-            <button onclick="window.location.href='welcomepage.html'" class="home-btn">Back to Home</button>
-        </div>
-
-    </div>
-
-    <script>
-        window.onload = function () {
-            const ref     = sessionStorage.getItem("blotter_ref");
-            const isAdmin = sessionStorage.getItem("from_admin");
-
-            if (ref) {
-                document.getElementById("ref-number").innerText = ref;
-                sessionStorage.removeItem("blotter_ref");
-            } else {
-                const year = new Date().getFullYear();
-                const rand = Math.floor(1000 + Math.random() * 9000);
-                document.getElementById("ref-number").innerText = "BRGY-" + year + "-" + rand;
-            }
-
-            // Set back button destination
-            const homeBtn = document.querySelector(".home-btn");
-            if (isAdmin === "blotter") {
-                homeBtn.textContent = "Back to Blotter Dashboard";
-                homeBtn.onclick = function() {
-                    sessionStorage.removeItem("from_admin");
-                    window.location.href = "Blotter.html";
-                };
-            } else {
-                homeBtn.onclick = function() {
-                    window.location.href = "welcomepage.html";
-                };
-            }
-        };
-
-    </script>
-</body>
+                if (refNum) {
+                    document.getElementById("ref-number").innerText = refNum;
+                } else {
+                    document.getElementById("ref-number").innerText =
+                        "NOT FOUND";
+                }
+            };
+        </script>
+    </body>
 </html>
