@@ -1,147 +1,156 @@
 <?php
-// ============================================================
-//  Barangay Tugtug E-System — Submit Document Request
-//  File: php/submit_document.php
-//  Updated to match db-barangay-system schema (no
-//  document_reference_number table; reference stored directly
-//  in document_request.document_refnumber)
-// ============================================================
-header("Content-Type: application/json");
-ini_set("display_errors", 0);
-ini_set("log_errors", 1);
-error_reporting(E_ALL);
+require "../include/conn.php";
 
-define("DB_HOST",    "localhost");
-define("DB_NAME",    "db-barangay-system");
-define("DB_USER",    "root");
-define("DB_PASS",    "");
-define("DB_CHARSET", "utf8mb4");
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // 1. Capture Form Inputs
+    $first_name = trim($_POST["first_name"]);
+    $last_name = trim($_POST["last_name"]);
+    $middle_name = trim($_POST["middle_name"]);
+    $suffix = $_POST["suffix"];
+    $birthday = $_POST["birthday"];
+    $age = intval($_POST["age"]);
+    $gender = $_POST["gender"];
+    $civil_status = $_POST["civil_status"];
+    $contact = $_POST["contact"];
+    $birthplace = $_POST["birthplace"];
+    $stay_years = intval($_POST["stay_years"]);
+    $stay_months = intval($_POST["stay_months"]);
+    $doc_id = intval($_POST["txtdocumenttype"]);
+    $quantity = intval($_POST["quantity"]);
+    $purpose = trim($_POST["purpose"]);
 
-$dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
-$opt = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => true,
-];
-
-try {
-    $pdo = new PDO($dsn, DB_USER, DB_PASS, $opt);
-} catch (PDOException $e) {
-    error_log("DB error: " . $e->getMessage());
-    echo json_encode(["success" => false, "message" => "Database connection error."]);
-    exit();
-}
-
-if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    http_response_code(405);
-    echo json_encode(["success" => false, "message" => "Method not allowed."]);
-    exit();
-}
-
-$body = file_get_contents("php://input");
-$data = json_decode($body, true);
-
-if (!$data) {
-    echo json_encode(["success" => false, "message" => "Invalid JSON data received."]);
-    exit();
-}
-
-// ── Generate unique reference number ─────────────────────────
-// New schema: document_refnumber is a unique column on document_request;
-// no separate document_reference_number table.
-$year    = date("Y");
-$ref_num = "";
-do {
-    $random  = str_pad(mt_rand(10000, 99999), 5, "0", STR_PAD_LEFT);
-    $ref_num = "DOC-" . $year . "-" . $random;
-    $check   = $pdo->prepare(
-        "SELECT COUNT(*) FROM document_request WHERE document_refnumber = :ref"
-    );
-    $check->execute([":ref" => $ref_num]);
-    $exists = $check->fetchColumn();
-} while ($exists > 0);
-
-try {
-    // ── Find or insert resident ───────────────────────────────
-    $res_check = $pdo->prepare(
-        "SELECT resident_ID FROM resident_information
-         WHERE first_name = :fn AND last_name = :ln LIMIT 1"
-    );
-    $res_check->execute([
-        ":fn" => trim($data["first_name"] ?? ""),
-        ":ln" => trim($data["last_name"]  ?? ""),
-    ]);
-    $resident = $res_check->fetch();
-
-    if ($resident) {
-        $resident_id = $resident["resident_ID"];
-    } else {
-        $middle = trim($data["middle_name"] ?? "");
-        $mi     = $middle ? strtoupper(substr($middle, 0, 1)) : "";
-        $gender = $data["gender"] ?? "";
-        $sex    = $gender === "Male" ? "M" : ($gender === "Female" ? "F" : "O");
-        $suffix = trim($data["suffix"] ?? "") ?: null;
-
-        $ins = $pdo->prepare(
-            "INSERT INTO resident_information
-                (first_name, last_name, middle_initial, suffix, sex, birthdate, birthplace)
-             VALUES (:fn, :ln, :mi, :suffix, :sex, :bd, :bp)"
-        );
-        $ins->execute([
-            ":fn"     => trim($data["first_name"] ?? ""),
-            ":ln"     => trim($data["last_name"]  ?? ""),
-            ":mi"     => $mi,
-            ":suffix" => $suffix,
-            ":sex"    => $sex,
-            ":bd"     => $data["birthday"]   ?? null,
-            ":bp"     => $data["birthplace"] ?? "",
-        ]);
-        $resident_id = $pdo->lastInsertId();
-    }
-
-    // ── Validate document_ID ──────────────────────────────────
-    $doc_id = intval($data["certificate"] ?? 0);
-    $docCheck = $pdo->prepare("SELECT COUNT(*) FROM documents WHERE document_ID = :did");
-    $docCheck->execute([":did" => $doc_id]);
-    if ($docCheck->fetchColumn() < 1) {
-        echo json_encode(["success" => false, "message" => "Invalid certificate selected. Got: " . ($data["certificate"] ?? "none")]);
+    // 2. Validation: Names should not contain numbers (Blotter Logic)
+    if (
+        preg_match("/[0-9]/", $first_name) ||
+        preg_match("/[0-9]/", $last_name)
+    ) {
+        header("Location: ../residentform.php?error=name_numbers");
         exit();
     }
 
-    // ── Insert document request ───────────────────────────────
-    $doc_stmt = $pdo->prepare(
-        "INSERT INTO document_request
-            (document_refnumber, resident_ID, document_ID, contact, document_purpose,
-             date, status, age, length_stay_years, length_stay_months, quantity)
-         VALUES
-            (:ref, :rid, :did, :contact, :purpose,
-             CURDATE(), 'Pending', :age, :stay_y, :stay_m, :qty)"
+    // 3. ID Image Upload Handling
+    $target_dir = "uploadsdoc/";
+    if (!is_dir($target_dir)) {
+        mkdir($target_dir, 0777, true);
+    }
+
+    $file_extension = pathinfo($_FILES["id_image"]["name"], PATHINFO_EXTENSION);
+    $new_filename = "ID_" . time() . "_" . $last_name . "." . $file_extension;
+    $target_file = $target_dir . $new_filename;
+    $db_save_path = "uploadsdoc/" . $new_filename;
+
+    if (!move_uploaded_file($_FILES["id_image"]["tmp_name"], $target_file)) {
+        header("Location: ../residentform.php?error=upload_fail");
+        exit();
+    }
+
+    // 4. Fetch Document Type Name (to display on success page)
+    $doc_name = "Document";
+    $get_doc = $conn->prepare(
+        "SELECT document_type FROM documents WHERE document_ID = ?",
     );
-    $doc_stmt->execute([
-        ":ref"     => $ref_num,
-        ":rid"     => $resident_id,
-        ":did"     => $doc_id,
-        ":contact" => trim($data["contact"]     ?? ""),
-        ":purpose" => trim($data["purpose"]     ?? ""),
-        ":age"     => intval($data["age"]       ?? 0),
-        ":stay_y"  => intval($data["stay_years"]  ?? 0),
-        ":stay_m"  => intval($data["stay_months"] ?? 0),
-        ":qty"     => intval($data["quantity"]  ?? 1),
-    ]);
-    $request_id = $pdo->lastInsertId();
+    $get_doc->bind_param("i", $doc_id);
+    $get_doc->execute();
+    $doc_res = $get_doc->get_result();
+    if ($d_row = $doc_res->fetch_assoc()) {
+        $doc_name = $d_row["document_type"];
+    }
 
-    echo json_encode([
-        "success"          => true,
-        "reference_number" => $ref_num,
-        "request_id"       => $request_id,
-    ]);
+    // 5. Generate Unique Reference Number
+    do {
+        $ref_number =
+            "DOC-" .
+            date("Y") .
+            "-" .
+            str_pad(mt_rand(1, 99999), 5, "0", STR_PAD_LEFT);
+        $chk = $conn->prepare(
+            "SELECT request_ID FROM document_request WHERE document_refnumber = ? LIMIT 1",
+        );
+        $chk->bind_param("s", $ref_number);
+        $chk->execute();
+        $chk->store_result();
+    } while ($chk->num_rows > 0);
 
-} catch (PDOException $e) {
-    error_log("Insert error: " . $e->getMessage());
-    echo json_encode([
-        "success" => false,
-        "message" => "Failed to save request: " . $e->getMessage(),
-    ]);
+    // 6. Resident Logic: Check/Insert resident
+    $mi = !empty($middle_name) ? strtoupper(substr($middle_name, 0, 1)) : "";
+    $sex_mapped = $gender === "Male" ? "M" : "F";
+
+    $check_res = $conn->prepare(
+        "SELECT resident_ID FROM resident_information
+         WHERE first_name = ? AND last_name = ? AND birthdate = ? AND middle_initial = ? LIMIT 1",
+    );
+    $check_res->bind_param("ssss", $first_name, $last_name, $birthday, $mi);
+    $check_res->execute();
+    $res_result = $check_res->get_result();
+
+    if ($row = $res_result->fetch_assoc()) {
+        // Resident already exists — reuse their ID
+        $resident_id = $row["resident_ID"];
+    } else {
+        // New resident — insert
+        $ins_res = $conn->prepare(
+            "INSERT INTO resident_information
+             (first_name, last_name, middle_initial, suffix, sex, birthdate, birthplace)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+        );
+        $ins_res->bind_param(
+            "sssssss",
+            $first_name,
+            $last_name,
+            $mi,
+            $suffix,
+            $sex_mapped,
+            $birthday,
+            $birthplace,
+        );
+        $ins_res->execute();
+        $resident_id = $conn->insert_id;
+    }
+    // 7. Insert Document Request
+    $sql = "INSERT INTO document_request (
+                document_refnumber,
+                resident_ID,
+                document_ID,
+                contact,
+                document_purpose,
+                quantity,
+                age,
+                length_stay_years,
+                length_stay_months,
+                id_image_path,
+                date,
+                status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), 'Pending')";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param(
+        "siisssiiis",
+        $ref_number,
+        $resident_id,
+        $doc_id,
+        $contact,
+        $purpose,
+        $quantity,
+        $age,
+        $stay_years,
+        $stay_months,
+        $db_save_path,
+    );
+
+    if ($stmt->execute()) {
+        // SUCCESS REDIRECT: Similar to Blotter, sending data via URL to the HTML page
+        header(
+            "Location: ../DocumentSuccess.html?ref=" .
+                urlencode($ref_number) .
+                "&type=" .
+                urlencode($doc_name),
+        );
+    } else {
+        header("Location: ../residentform.php?error=db_fail");
+    }
+
+    $stmt->close();
+    $conn->close();
+    exit();
 }
-exit();
 ?>
